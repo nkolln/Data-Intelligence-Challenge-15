@@ -26,7 +26,7 @@ grid, robots = None, None
 occupied = False
 PATH = os.getcwd()
 
-
+     
 def draw_grid(grid):
     """'Helper function for creating a JSON payload which will be displayed in the browser."""
     global robots
