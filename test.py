@@ -29,6 +29,9 @@ for i in range(1,farthest_step_vision):
                 max_val = lst_val[0]
         else:
             max_val = 0
+        
+        if max_val <1:
+            max_val = 0
         possible_tiles_one.update({key:max_val+val})
         print(possible_tiles_one)
 
