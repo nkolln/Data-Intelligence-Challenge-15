@@ -1,7 +1,2 @@
-What we need:
-    Logic for when it gets stuck
-    Possibly incoroporate memory
-    Logic in deciding to incentivize finishing a rooms corners so the same path isnt crossed (Award points that are surrounded by checked)
-    Need to identify walls for vision
-    Empty room 
-    Goal Identification
+Issues with value iteration 2:
+    Can get 0 locked (happens with small gamma)
