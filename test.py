@@ -1,4 +1,6 @@
-import operator
+
+
+"""import operator
 
 possible_tiles = {(1,1):1,(2,0):1,(1,0):1,(0,1):3,(0,2):1,(-1,1):0,(-1,0):2,(0,-1):1} #robot.possible_tiles_after_move()
 #possible_tiles_good = {k:v for k,v in possible_tiles.items() if float(v) >= 1}
@@ -38,7 +40,8 @@ for i in range(1,farthest_step_vision):
 print(max(possible_tiles_one, key=possible_tiles_one.get))
 print(list(possible_tiles_one.keys())[list(possible_tiles_one.values()).index(1.0)])
 
-"""possible_tiles = {(1, -1): -2, (1, 0): 1, (0, 1): 1, (-1, 0): -1}
+#-----------------------------------
+possible_tiles = {(1, -1): -2, (1, 0): 1, (0, 1): 1, (-1, 0): -1}
 print({k:v for k,v in possible_tiles.items() if float(v) < 1})
 print(list(possible_tiles.keys()))
 print(list(possible_tiles.keys())[list(possible_tiles.values()).index(1.0)])
