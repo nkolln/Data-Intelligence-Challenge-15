@@ -135,6 +135,9 @@ def robot_epoch(robot):
     
     #choose move randomly based on the probabilities in the policy_map
     best_move = choices(population = moves, weights = policy_map[current_pos])[0]
+    for i in range(4):
+        pos_after = update_cor(*current_pos, moves[i])
+        print(f"{moves[i]}: {V[pos_after]}")
     #print(f"chosen move on {current_pos}: {best_move}, out of: {policy_map[current_pos]}")
     #print(V)
     previous_move = best_move
