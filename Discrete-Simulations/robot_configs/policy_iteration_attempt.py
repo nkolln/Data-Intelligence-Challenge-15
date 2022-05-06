@@ -2,26 +2,15 @@ import numpy as np
 from random import choices
 
 '''
-Update 5 May: I removed the stochastisicity of the map, so now each tile is either dirty,
-clean or obstacle (deterministic, boolean). In the app there's also goal tiles and death tiles,
-but I'm ignoring those for now.
-I also added that Nigel remembers the move it made previously and when it is torn between
-moves, it will choose the same move as it did previously, forcing it to move in mostly straight
-lines.
-I solved the initial infinite loop issue. The cause of it was that I had used 0 as a starting
-value for best_V (line 107), but in some cases each bordering tile had a value smaller than 0,
-which made it so no move was chosen at all as a best move, which caused a division by 0 in line
-125, which caused NaN values in the policy_map.
-However... it seems it does still get stuck in an infinite loop, only now it happens later
-in the simulation. I doubt it's the same cause, but I'm also not sure what the cause could
-be :(
-     -Rozanne
+Update 6 May: We worked out a lot of the bugs. Nigel now works decently on some maps though we haven't
+had time for extensive testing. It is hard to say whether the flaws in this implementation are
+due to the implementation itself or due to policy iteration just not being that good.
 '''
 
 #TO IMPLEMENT: global variable(s) so we remember Values and policies between epochs, for speed
 #V = ...
 #policy_map = ...
-rewards = [-10,20,-20] #reward for landing on clean, dirty or obstacle, respectively
+rewards = [-4,50,-10] #reward for landing on clean, dirty or obstacle, respectively
 moves = ['n','e','s','w']
 previous_move = None
 
@@ -60,14 +49,9 @@ def robot_epoch(robot):
     
     #print(world_state[:,:,1])
     
-    #fill Value grid with raw rewards as a starting point
-    for i in range(3):
-        #print("filling V")
-        V[world_state[:,:,i]] = rewards[i]
-    
     #start with 25% chance for a move in each direction, arbitrary policy
     policy_map = np.full(shape=(*V.shape,4),fill_value=0.25)
-    theta = 0.1
+    theta = 5
     gamma = 0.5
     
     opt_policy = False
@@ -75,9 +59,15 @@ def robot_epoch(robot):
     #let's start iterating:
     while opt_policy==False and it < 25:
         #print("still haven't found optimal policy")
-        biggest_dif = 10
-        while biggest_dif > theta:
-            #print(f"still iterating, biggest dif is {biggest_dif}")
+        #fill Value grid with raw rewards as a starting point
+        for i in range(3):
+            #print("filling V")
+            V[world_state[:,:,i]] = rewards[i]
+        biggest_dif = 1000
+        it2 = 0
+        while biggest_dif > theta and it2 < 25:
+            print(f"still iterating, biggest dif is {biggest_dif}")
+            
             max_dif_so_far = 0
             for x in range(V.shape[0]):
                 for y in range(V.shape[1]):
@@ -95,6 +85,8 @@ def robot_epoch(robot):
                         V_new += policy_map[x,y,i] * G
                     V[x,y] = V_new
                     max_dif_so_far = max(max_dif_so_far, abs(V_new-V_old))
+                    
+            it2 += 1
                     
                 
             #update biggest_dif so the loop won't run forever
