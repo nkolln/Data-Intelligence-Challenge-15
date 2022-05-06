@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, jsonify
 from engineio.payload import Payload
 
 # Increase limit to not drop too many packets:
-Payload.max_decode_packets = 1000
+Payload.max_decode_packets = 100000
 import random
 from flask_socketio import SocketIO
 import base64

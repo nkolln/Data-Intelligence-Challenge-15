@@ -72,7 +72,7 @@ def robot_epoch(robot):
     
     opt_policy = False
     #let's start iterating:
-    while opt_policy==False:
+    while opt_policy==False and it < 25:
         #print("still haven't found optimal policy")
         biggest_dif = 10
         while biggest_dif > theta:
@@ -128,6 +128,8 @@ def robot_epoch(robot):
                 if (old_policy != new_policy).any(): #if the policy needs to be changed
                     opt_policy = False
                     policy_map[x,y,:] = new_policy #update policy
+                    
+        it += 1
                 
     
     #choose move randomly based on the probabilities in the policy_map
