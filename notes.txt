@@ -1,2 +1,5 @@
 Issues with value iteration 2:
     Can get 0 locked (happens with small gamma)
+    Check everything within a given square, if all 0's or non valid then make bigger. Could be asynchronus
+    Weighting schemes: Positive for single or border values - Negative for groups
+    Probability calculation

@@ -1,4 +1,6 @@
-
+import operator
+if  tuple(map(operator.add, (1,0), (-1,0)))==(0,0):
+    print('here')
 """import operator
 
 possible_tiles = {(1,1):1,(2,0):1,(1,0):1,(0,1):3,(0,2):1,(-1,1):0,(-1,0):2,(0,-1):1} #robot.possible_tiles_after_move()
