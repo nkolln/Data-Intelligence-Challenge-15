@@ -71,6 +71,7 @@ def robot_epoch(robot):
     gamma = 0.5
     
     opt_policy = False
+    it = 0
     #let's start iterating:
     while opt_policy==False and it < 25:
         #print("still haven't found optimal policy")
