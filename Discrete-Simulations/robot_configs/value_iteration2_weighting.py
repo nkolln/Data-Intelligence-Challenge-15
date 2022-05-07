@@ -51,7 +51,7 @@ def robot_epoch(robot):
                     lst_neighbor.append(dir)
         if count_walls == 2 and tuple(map(operator.add, lst_neighbor[0], lst_neighbor[1]))==(0,0): #If there are two walls next to eachother than treat as door
             rewards[coord] -= 1
-            print('-'*20)
+            # print('-'*20)
         #If it has no dirty tiles around, prioritize
         if count_neighbor == 4:
             rewards[coord] +=20
