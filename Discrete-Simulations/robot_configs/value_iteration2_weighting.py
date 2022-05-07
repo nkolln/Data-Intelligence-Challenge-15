@@ -29,7 +29,7 @@ def robot_epoch(robot):
     #Added logic to give scores based on location to other clean tiles and walls
     for coord in valid_states:
         lst_dir = [];lst_neighbor=[]
-        count = 0; count_neighbor = 0
+        count_walls = 0; count_neighbor = 0
         for i in range(4):
         #for dir in moves_actual:
             dir = moves_actual[i]
@@ -45,16 +45,16 @@ def robot_epoch(robot):
                     rewards[coord] += 1
                 if new_loc in lst_clean or new_loc in lst_taboo or new_loc in lst_wall:
                     count_neighbor += 1
+            #elif current_world[coord]==1:
+                if new_loc in lst_taboo: #Logic to find if there is a doorway
+                    count_walls+=1
                     lst_neighbor.append(dir)
-            elif current_world[coord]==0:
-                if new_loc in lst_wall: #Logic to find if there is a doorway
-                    count+=1
-        if count == 2:# and tuple(map(operator.add, lst_neighbor[0], lst_neighbor[1]))==(0,0): #If there are two walls next to eachother than treat as door
-            rewards[coord] -= 4
+        if count_walls == 2 and tuple(map(operator.add, lst_neighbor[0], lst_neighbor[1]))==(0,0): #If there are two walls next to eachother than treat as door
+            rewards[coord] -= 1
             print('-'*20)
-        #If it has no dirty tiles, prioritize
+        #If it has no dirty tiles around, prioritize
         if count_neighbor == 4:
-            rewards[coord] +=10
+            rewards[coord] +=20
         if len(lst_dir)>0:
             actions.update({coord:lst_dir})
     """print(f'valid_states: {valid_states}')
@@ -135,7 +135,7 @@ def robot_epoch(robot):
         # If we don't have the wanted orientation, rotate clockwise until we do:
         # print('Rotating right once.')
         robot.rotate('r')
-    print(f'current position: {current_pos}\n move: {move}\nMatrix: {pd.DataFrame(V).T}')
+    #print(f'current position: {current_pos}\n move: {move}\nMatrix: {pd.DataFrame(V).T}')
     robot.move()
     #print(pd.DataFrame(V).T)
     #print('-'*50)
