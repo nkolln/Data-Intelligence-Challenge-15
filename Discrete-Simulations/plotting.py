@@ -2,6 +2,12 @@ import matplotlib.pyplot as plt
 import json
 from statistics import mean
 
+"""
+data looks like:
+{VI: grid1{theta-gamma pair1:{efficiencies:[],n_moves:[],cleaned_percentage[]},theta-gama pair2:{}},
+     grid2{} }  
+"""
+
 
 def calc_overall_avg_eff(data, robot_name):
     avg = 0
