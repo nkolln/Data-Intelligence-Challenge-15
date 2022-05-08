@@ -5,6 +5,7 @@ from robot_configs.value_iteration2_weighting import robot_epoch
 import pickle
 from environment import Robot
 import matplotlib.pyplot as plt
+import time
 
 grid_file = 'house.grid'
 # Cleaned tile percentage at which the room is considered 'clean':
@@ -15,6 +16,8 @@ efficiencies = []
 n_moves = []
 deaths = 0
 cleaned = []
+
+time_start = time.time()
 
 # Run 100 times:
 for i in range(100):
@@ -54,7 +57,8 @@ for i in range(100):
     efficiencies.append(float(efficiency))
     n_moves.append(len(robot.history[0]))
     cleaned.append(clean_percent)
-
+time_sec = time.time()-time_start
+print(f'Total time: {time_sec%60} minutes')
 # Make some plots:
 plt.hist(cleaned)
 plt.title('Percentage of tiles cleaned.')
