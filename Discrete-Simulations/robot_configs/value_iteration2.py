@@ -71,7 +71,7 @@ def robot_epoch(robot):
 
                         V_temp = rewards[state] + (gamma * ((1-noise)* V[loc] + (noise * V[loc_rand])))
                     else:
-                        V_temp = rewards[state] + (gamma * (V[loc] ))
+                        V_temp = rewards[state] + (gamma * (V[loc]))
                     if V_temp > v_new:
                         v_new = V_temp
                         policy[state] = dir

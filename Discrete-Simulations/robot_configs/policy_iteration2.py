@@ -41,10 +41,11 @@ def policy_evaluation(policy,all_states,actions,moves,moves_actual,noise,rewards
 def robot_epoch(robot):
     #rewards = [-1,1,-2] #reward for landing on clean, dirty or obstacle, respectively
     moves = ['n','e','s','w'];moves_actual = [(0,-1),(1,0),(0,1),(-1,0)]
-    theta = 0.1; gamma = 0.5; noise = 0.2
-    current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape
+    theta = 0.01; gamma = 0.5; noise = 0.2
+    current_world = robot.grid.cells;current_world = current_world.T; current_pos = robot.pos; shape_w = current_world.shape
     #current_world[current_pos] = 0
     print(current_world)
+    print(shape_w)
 
 
     #bounds = [[current_pos[0], current_pos[0]+shape_w[0]],[current_pos[1], current_pos[1]+shape_w[1]]]
@@ -133,6 +134,9 @@ def robot_epoch(robot):
     print(f'taboo list: {lst_taboo}')
     print(f'current_pos: {current_pos}')"""
             
+    """for item in rewards:
+        if item in lst_clean:
+            rewards[item] = -4"""
 
     #Random initial policy for all
     policy = {}
@@ -144,29 +148,35 @@ def robot_epoch(robot):
     for i in range(100):
         stable_policy = True
         V = policy_evaluation(policy,all_states,actions,moves,moves_actual,noise,rewards,gamma,V,theta)
-        #print(V)
+        
+        print(f'Original Rewards: {pd.DataFrame(rewards)}')
+        print(f'Intemediary V: {pd.DataFrame(V)}')
+        print('-'*100)
+        #rewards = rewards.T
+        #V = V.T
         for state in valid_states:
             current_action = policy[state]
-            best_action = (0,0)
+            best_action = current_action
             best_score = 0
             for act in actions[state]: #Loops through possible actions of a states
                 dir = moves_actual[moves.index(act)] #Gets the movement converted from letter to numeric
                 loc = tuple(map(operator.add, state, dir)) #Finds the new location
-                V_temp = rewards[state] + (gamma * (V[loc] ))
+                V_temp = rewards[(state[1],state[0])] + (gamma * (V[(loc[1],loc[0])]))
+                print(f'Reward: {rewards[state]}+ {gamma}*{V[loc]}== {V_temp}')
                 if V_temp > best_score:
                     best_action = act#moves[moves.index(act)]
                     best_score = V_temp
                     #print(f'act: {act} and score: {best_score}')
-                    print(best_action)
+                print(f'State: {state}\nact: {act, dir} which is location: {loc}\nScore: {V_temp}')
+
 
             if current_action != best_action:
                 stable_policy = False
                 policy[state]= best_action#moves_actual[moves.index(best_action)]
-                print(best_action)
-                print('-'*20)
+                print('change')
         if stable_policy:
-            pass
-            #print(policy, V)
+            print(f'Stable on iters: {i}')
+            break
         else:
             print(f'Never stable, iteration: {i}')
         
@@ -193,11 +203,11 @@ def robot_epoch(robot):
     """if all(value == 0 for value in possible_tiles_fr.values()):
         robot.move()
     else:"""
-    print(current_pos)
-    print(f'V: {V}\nPolicy: {policy[current_pos]}')
     print(policy)
-    print(moves_actual)
-    move = moves_actual[moves.index(policy[current_pos])]
+    print(current_pos, policy[current_pos])
+    print(pd.DataFrame(V))
+    print(pd.DataFrame(current_world))
+    move = moves_actual[moves.index(policy[(current_pos[0],current_pos[1])])]
     #move = max(possible_tiles_fr, key=possible_tiles_fr.get)
     #move = list(possible_tiles.keys())[list(possible_tiles.values()).index(1.0)]
     new_orient = list(robot.dirs.keys())[list(robot.dirs.values()).index(move)]

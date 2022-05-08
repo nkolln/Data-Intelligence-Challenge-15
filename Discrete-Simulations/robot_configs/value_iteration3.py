@@ -23,18 +23,28 @@ def robot_epoch(robot):
             #for num,lst in zip(lst_vals,lst_lsts):
                 if cur_val == key:
                     lst.append((x,y))
+    
+    for x in range(shape_w[0]):
+        for y in range(shape_w[1]):
+            cur_val = current_world[x][y]
+            #for num,lst in zip(lst_vals,lst_lsts):
+            if cur_val < -2:
+                print('here')
+                print((x,y))
+                lst_dirty.append((x,y))
     all_states.extend(lst_clean);all_states.extend(lst_dirty);all_states.extend(lst_goal)
     valid_states.extend(all_states)
     all_states.extend(lst_end)
 
     #Prune mode
-    prune_size = 4
+    prune_size = 3
     prune_state = 0
-    if prune_state == 1:
+    if prune_state == 1 and robot.possible_tiles_after_move() in lst_dirty:
         window = [[max(current_pos[0]-prune_size,0), min(current_pos[0]+prune_size,shape_w[0])],[max(current_pos[1]-prune_size,0), min(current_pos[1]+prune_size,shape_w[1])]]
 
         #valid_states_temp = np.copy(valid_states)
-        while True and lst_dirty:
+        x = 0
+        while x==0 and all_states:
             lst_dirty_temp = []
             #print(f'window range: {window}')
             for item in lst_dirty:
@@ -45,17 +55,22 @@ def robot_epoch(robot):
 
             if not lst_dirty_temp: #if no value is dirty then increase counter
                 prune_size+=1
-                break
+                x=1
                 #print('here')
             else:
-                lst_dirty=lst_dirty_temp
+                all_states=lst_dirty_temp
+                x=1
+
 
 
     actions = {}; rewards = np.copy(current_world)
+    rewards[current_pos]= 0
 
     #Stores all the possible movements for valid states
     #Added logic to give scores based on location to other clean tiles and walls
     for coord in valid_states:
+        print('-'*20)
+        print(coord)
         lst_dir = [];lst_neighbor=[]
         count_walls = 0; count_neighbor = 0
         """if current_world[coord]==0: #if its clean
@@ -64,8 +79,10 @@ def robot_epoch(robot):
         #for dir in moves_actual:
             dir = moves_actual[i]
             new_loc = tuple(map(operator.add, coord, dir))
-            if new_loc in valid_states:#((new_loc not in lst_taboo) and (new_loc not in end_states)):# and (new_loc[0] in range(bounds[0][0],bounds[0][1]))and(new_loc[1] in range(bounds[1][0],bounds[1][1]))):
+            print(new_loc)
+            if new_loc in valid_states:
                 lst_dir.append(moves[i])
+                print('appended')
                 if new_loc in lst_clean and current_world[coord] == 1 or current_world[coord] == 2: #Reward for nearby clean tiles
                     rewards[coord] += 2
             elif current_world[coord]==1 or current_world[coord]==2:
@@ -135,29 +152,7 @@ def robot_epoch(robot):
             break
         it+=1
     
-    
-    possible_tiles = robot.possible_tiles_after_move()
-    #Just to make sure its 1
-    possible_tiles = {k:v for k,v in possible_tiles.items() if abs(k[0])+abs(k[1])==1}
-
-    #Update tiles with calculated score (only keeps relevant)
-    possible_tiles_fr = {}
-    if all(current_world[value] <= 0 for value in valid_states):
-        for key in possible_tiles.keys():
-            key_n = tuple(map(operator.add, key, current_pos))
-            if key_n in all_states:
-                possible_tiles_fr.update({key:V[key_n]})
-    else:
-        for key in possible_tiles.keys():
-            key_n = tuple(map(operator.add, key, current_pos))
-            if key_n in valid_states:
-                possible_tiles_fr.update({key:V[key_n]})
-    
-    #If in vacuum zone just moving across is the best way to find something of value
-    """if all(value == 0 for value in possible_tiles_fr.values()):
-        robot.move()
-    else:"""
-    move = max(possible_tiles_fr, key=possible_tiles_fr.get)
+    move = policy[current_pos]
     #move = list(possible_tiles.keys())[list(possible_tiles.values()).index(1.0)]
     new_orient = list(robot.dirs.keys())[list(robot.dirs.values()).index(move)]
         # Orient ourselves towards the dirty tile:  
@@ -167,5 +162,3 @@ def robot_epoch(robot):
         robot.rotate('r')
     #print(f'current position: {current_pos}\n move: {move}\nMatrix: {pd.DataFrame(V).T}')
     robot.move()
-    #print(pd.DataFrame(V).T)
-    #print('-'*50)
