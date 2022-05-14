@@ -10,32 +10,9 @@ import robot_configs.policy_iteration as PI
 import pickle
 import os
 from environment import Robot
-import matplotlib.pyplot as plt
-from statistics import mean
-
-
-# def calc_grid_avg_eff(stats: dict, robot_name, grid_name):
-#     robot_stats = stats.get(robot_name)
-#     efficiency_array = robot_stats.get(grid_name).get("efficiencies")
-#     avg = mean(efficiency_array)
-#     return avg
-#
-#
-# def calc_overall_avg_eff(stats: dict, robot_name):
-#     avg = 0
-#     robot_stats = stats.get(robot_name)
-#
-#     for grid_name in robot_stats.keys():
-#         temp_avg = calc_grid_avg_eff(stats, robot_name, grid_name)
-#         avg += temp_avg
-#
-#     avg = avg/len(robot_stats.keys())
-#     return avg
-
 
 grid_files = os.listdir("test_grids")
-# print(grid_files)
-# Cleaned tile percentage at which the room is considered 'clean':
+
 
 stopping_criteria = 100
 iter_count = 10
@@ -43,13 +20,13 @@ theta_values = [0.2, 1, 5]
 gamma_values = [0.2, 0.5, 0.8, 1]
 
 # Keep track of some statistics:
-statistics = {"PI": {},
-              # "PI": {}
+statistics = {"VI": {},
+              "PI": {}
               }
 # initialize the dictionary
 for grid_name in grid_files:
+    statistics.get("VI").update({grid_name: {}})
     statistics.get("PI").update({grid_name: {}})
-    # statistics.get("PI").update({grid_name: {}})
 # print(statistics)
 
 for robot_name in statistics.keys():
@@ -88,10 +65,10 @@ for robot_name in statistics.keys():
                     while time.time() - iter_start <= 25:
                         n_epochs += 1
                         # Do a robot epoch (basically call the robot algorithm once):
-                        # if robot_name == "VI":
-                        PI.robot_epoch(robot, theta, gamma)
-                        # else:
-                        #     PI.robot_epoch(robot)
+                        if robot_name == "VI":
+                            VI.robot_epoch(robot, theta, gamma)
+                        else:
+                            PI.robot_epoch(robot, theta, gamma)
                         # Stop this simulation instance if robot died :( :
                         if not robot.alive:
                             deaths += 1
@@ -122,14 +99,14 @@ for robot_name in statistics.keys():
                 # create a new theta gamma pair name add its statistics to the dictionary
                 pair_name = "theta " + str(theta) + "-gamma " + str(gamma)
                 print(pair_name)
-                # if robot_name == "VI":
-                statistics.get("PI").get(grid_file).update({pair_name: {"efficiencies": efficiencies,
-                                                                        "n_moves": n_moves,
-                                                                        "cleaned": cleaned}})
-                # else:
-                #     statistics.get("PI").get(grid_file).update({"efficiencies": efficiency,
-                #                                                 "n_moves": n_moves,
-                #                                                 "cleaned": cleaned})
+                if robot_name == "VI":
+                    statistics.get("VI").get(grid_file).update({pair_name: {"efficiencies": efficiencies,
+                                                                            "n_moves": n_moves,
+                                                                            "cleaned": cleaned}})
+                else:
+                    statistics.get("PI").get(grid_file).update({pair_name: {"efficiencies": efficiencies,
+                                                                            "n_moves": n_moves,
+                                                                            "cleaned": cleaned}})
 
 
 
@@ -137,28 +114,8 @@ for robot_name in statistics.keys():
         print("one grid took: ", time.time() - grid_start, " seconds")
 
     print("one robot took: ", time.time() - robot_start, " seconds")
-
-with open("PI_results.json", "w") as json_file:
+#  store results in json file
+with open("results.json", "w") as json_file:
     json.dump(statistics, json_file)
 
-# print("efficiency of VI: ", calc_overall_avg_eff(statistics, "VI"))
-#
-# for index, grids in enumerate(statistics.get("VI").keys()):
-#     print("efficiency of VI on grid ", grids, ": ", calc_grid_avg_eff(statistics, "VI", grids))
 
-# Make some plots:
-# plt.figure()
-# plt.bar()
-
-
-# plt.hist(cleaned)
-# plt.title('Percentage of tiles cleaned.')
-# plt.xlabel('% cleaned')
-# plt.ylabel('count')
-# plt.show()
-#
-# plt.hist(efficiencies)
-# plt.title('Efficiency of robot.')
-# plt.xlabel('Efficiency %')
-# plt.ylabel('count')
-# plt.show()

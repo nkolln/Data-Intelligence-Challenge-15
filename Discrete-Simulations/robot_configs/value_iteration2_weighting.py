@@ -10,9 +10,9 @@ def robot_epoch(robot, theta_value, gamma_value):
     moves = ['n', 'e', 's', 'w'];
     moves_actual = [(0, -1), (1, 0), (0, 1), (-1, 0)]
     theta = theta_value; # 0.2 1 5
-    theta = 0.1; # 0.2 1 5
+    # theta = 0.1; # 0.2 1 5
     gamma = gamma_value; # 0.2 0.5 0.8 1
-    gamma = 0.5; # 0.2 0.5 0.8 1
+    # gamma = 0.5; # 0.2 0.5 0.8 1
     noise = 0.2
     current_world = robot.grid.cells;
     current_pos = robot.pos;
@@ -46,7 +46,7 @@ def robot_epoch(robot, theta_value, gamma_value):
 
     # Prune mode
     prune_size = 4
-    prune_state = 1
+    prune_state = 0
     if prune_state == 1:
         window = [[max(current_pos[0] - prune_size, 0), min(current_pos[0] + prune_size, shape_w[0])],
                   [max(current_pos[1] - prune_size, 0), min(current_pos[1] + prune_size, shape_w[1])]]
