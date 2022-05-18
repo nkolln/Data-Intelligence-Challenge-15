@@ -209,10 +209,10 @@ def train_monte_carlo_e_soft(robot, episodes=100, policy=None, epsilon=0.01):
 
     for _ in range(episodes):  # Looping through episodes
         test_robot = copy.deepcopy(robot)
-        print("episode ", _)
+        # print("episode ", _)
         G = 0  # Store cumulative reward in G (initialized at 0)
         episode, efficiency = run_episode(robot=test_robot, policy=policy)  # Store state, action and value respectively
-
+        print("episode ", _, "efficiency: ", efficiency)
         # for loop through reversed indices of episode array.
         # The logic behind it being reversed is that the eventual reward would be at the end.
         # So we have to go back from the last timestep to the first one propagating result from the future.
