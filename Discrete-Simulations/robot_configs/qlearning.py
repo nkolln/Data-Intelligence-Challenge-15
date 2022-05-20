@@ -1,39 +1,8 @@
 import numpy as np
 import operator
 import pandas as pd
-#calc = 0
-def initialize_Q(actions):
-    Q ={}
-    for coord,lis in actions.items():
-        rew_dic = {}
-        for i in lis:
-            rew_dic[i] = 0
-        Q[coord] = rew_dic
-    return Q
 
-def select_action(Q, state, policy):
-    epsilon = 0.5
-    if policy and np.random.uniform(0, 1) < epsilon:
-        best_action = np.random.choice(list(Q[state].keys()))
-    else:
-        max_actions = [key for key, value in Q[state].items() if value == max(Q[state].values())]
-        best_action = np.random.choice(max_actions)
-    return str(best_action)
-
-def take_action(action, rewards,moves,moves_actual, current_pos, visited, lst_dirty):
-    done = False
-    next_state = tuple(map(operator.add, moves_actual[moves.index(action)], current_pos))
-    reward = rewards[next_state]
-    difference = list(set(lst_dirty) - set(visited))
-    if len(difference) == 0:
-        done = True
-    return next_state, reward, done
-
-def robot_epoch(robot):
-    #rewards = [-1,1,-2] #reward for landing on clean, dirty or obstacle, respectively
-    moves = ['n','e','s','w'];moves_actual = [(0,-1),(1,0),(0,1),(-1,0)]
-    current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape
-
+def list_creator(shape_w, current_world):
     valid_states = []
     lst_end = []
     lst_goal = []
@@ -64,7 +33,11 @@ def robot_epoch(robot):
     valid_states.extend(all_states)
     all_states.extend(lst_end)
 
-    actions = {};Q = {}; rewards = np.copy(current_world)
+    return valid_states, lst_taboo, lst_wall, lst_clean, lst_dirty, lst_goal, lst_end
+
+def reward_system(valid_states, moves_actual, moves, current_world, lst_clean, lst_taboo, lst_wall):
+    rewards = np.copy(current_world)
+    actions = {}
     #Stores all the possible movements for valid states
     #Added logic to give scores based on location to other clean tiles and walls
     for coord in valid_states:
@@ -98,13 +71,52 @@ def robot_epoch(robot):
             rewards[coord] +=20
         if len(lst_dir)>0:
             actions.update({coord:lst_dir})
+    
+    return actions, rewards
 
+def initialize_Q(actions):
+    Q ={}
+    for coord,lis in actions.items():
+        rew_dic = {}
+        for i in lis:
+            rew_dic[i] = 0
+        Q[coord] = rew_dic
+    return Q
+
+def select_action(Q, state, policy):
+    epsilon = 0.5
+    if policy and np.random.uniform(0, 1) < epsilon:
+        best_action = np.random.choice(list(Q[state].keys()))
+    else:
+        max_actions = [key for key, value in Q[state].items() if value == max(Q[state].values())]
+        best_action = np.random.choice(max_actions)
+    return str(best_action)
+
+def take_action(action, rewards,moves,moves_actual, current_pos, visited, lst_dirty):
+    done = False
+    next_state = tuple(map(operator.add, moves_actual[moves.index(action)], current_pos))
+    reward = rewards[next_state]
+    difference = list(set(lst_dirty) - set(visited))
+    if len(difference) == 0:
+        done = True
+    return next_state, reward, done
+
+def robot_epoch(robot):
+    #rewards = [-1,1,-2] #reward for landing on clean, dirty or obstacle, respectively
+    moves = ['n','e','s','w'];moves_actual = [(0,-1),(1,0),(0,1),(-1,0)]
+    current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape 
+
+    valid_states, lst_taboo, lst_wall, lst_clean, lst_dirty, lst_goal, lst_end = list_creator(shape_w, current_world)
+    actions, rewards = reward_system(valid_states, moves_actual, moves, current_world, lst_clean, lst_taboo, lst_wall)
     
     alpha = 0.6; gamma= 0.8
     Q = initialize_Q(actions)
+    
+    # Q-LEARNING MAIN LOOP
+
     #for each episode
-    for i in range(50):
-        #start with s
+    for i in range(200):
+        #start with current position
         state = current_pos
         visited = []
         #for each step of episode
@@ -126,9 +138,8 @@ def robot_epoch(robot):
             if done:
                 break
     
-    #print(Q)
     max_actions = [key for key, value in Q[current_pos].items() if value == max(Q[current_pos].values())]
-    #print("max_actions",max_actions)
+    
     if len(max_actions) == 1:
         max_action = max_actions[0]
     else:
