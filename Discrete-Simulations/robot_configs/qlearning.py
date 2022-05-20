@@ -100,7 +100,7 @@ def robot_epoch(robot):
             actions.update({coord:lst_dir})
 
     
-    alpha = 0.6; gamma= 0.8
+    alpha = 0.6; gamma= 0.5
     Q = initialize_Q(actions)
     #for each episode
     for i in range(50):
