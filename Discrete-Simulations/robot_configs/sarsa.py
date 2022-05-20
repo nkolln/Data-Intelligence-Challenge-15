@@ -95,7 +95,7 @@ def initialize_rew_act(rewards,actions,valid_states,moves_actual,moves,lst_clean
             # print('-'*20)
         # If it has no dirty tiles around, prioritize
         if count_neighbor == 4:
-            rewards[coord] += 40
+            rewards[coord] += 100
         if len(lst_dir) > 0:
             actions.update({coord: lst_dir})
             #Q.update({coord:[0 for i in range(len(lst_dir))]})
@@ -121,13 +121,14 @@ def move(Q,dct_map,current_pos,moves_actual,robot):
     # print(f'current position: {current_pos}\n move: {move}\nMatrix: {pd.DataFrame(V).T}')
     robot.move()
 
-def calculate_Q_matrix(shape_w,moves,moves_actual,current_pos,dct_map,actions,noise,alpha,rewards,gamma,inner_loop_count):
+def calculate_Q_matrix(shape_w,moves,moves_actual,current_pos,dct_map,actions,noise,alpha,rewards,gamma,inner_loop_count,theta):
     #V = np.copy(rewards)
     Q = np.zeros((shape_w[0]*shape_w[1], len(moves)))
     # loop and maximize score
     it = 0
     while it < 500:
-        most_change = 0
+        Q_old = np.copy(Q)
+        #most_change = 0
         #Choose current state and choose new direction
         cur_pos = current_pos
         cur_state,cur_dir,cur_num = get_info(cur_pos, dct_map, moves,moves_actual,actions,noise,Q)
@@ -146,10 +147,12 @@ def calculate_Q_matrix(shape_w,moves,moves_actual,current_pos,dct_map,actions,no
             cur_pos = nxt_state_actual
 
             it_inner+=1
+        #print(Q[cur_state],Q_old[cur_state])
+        most_change = np.max(abs(Q-Q_old))
         it+=1
 
         # print(f'iteration: {it+1}\nChange: {most_change}')
-        """if most_change < theta:
+        """if most_change < theta and most_change >0.001 and it>250:
             break"""
     return(Q)
 
@@ -157,10 +160,10 @@ def robot_epoch(robot):
     # rewards = [-1,1,-2] #reward for landing on clean, dirty or obstacle, respectively
     moves = ['n', 'e', 's', 'w'];
     moves_actual = [(0, -1), (1, 0), (0, 1), (-1, 0)]
-    theta = 0.2; # 0.2 1 5
-    alpha = .8
-    gamma = 0.8; # 0.2 0.5 0.8 1
-    noise = 0.5
+    theta = 0.1; # 0.2 1 5
+    alpha = .9
+    gamma = 0.9; # 0.2 0.5 0.8 1
+    noise = 0.1
     current_world = robot.grid.cells;
     current_pos = robot.pos;
     shape_w = current_world.shape
@@ -176,7 +179,7 @@ def robot_epoch(robot):
     rewards,actions = initialize_rew_act(rewards,actions,valid_states,moves_actual,moves,lst_clean,lst_wall, lst_taboo,current_world)
 
     inner_loop_count = shape_w[0]*shape_w[1]/4
-    inner_loop_count = min(inner_loop_count,40)
-    Q = calculate_Q_matrix(shape_w,moves,moves_actual,current_pos,dct_map,actions,noise,alpha,rewards,gamma,inner_loop_count)
+    inner_loop_count = max(inner_loop_count,150)
+    Q = calculate_Q_matrix(shape_w,moves,moves_actual,current_pos,dct_map,actions,noise,alpha,rewards,gamma,inner_loop_count,theta)
     
     move(Q,dct_map,current_pos,moves_actual,robot)
