@@ -109,7 +109,7 @@ def robot_epoch(robot):
     valid_states, lst_taboo, lst_wall, lst_clean, lst_dirty, lst_goal, lst_end = list_creator(shape_w, current_world)
     actions, rewards = reward_system(valid_states, moves_actual, moves, current_world, lst_clean, lst_taboo, lst_wall)
     
-    alpha = 0.6; gamma= 0.8
+    alpha = 0.6; gamma= 0.5
     Q = initialize_Q(actions)
     
     # Q-LEARNING MAIN LOOP
