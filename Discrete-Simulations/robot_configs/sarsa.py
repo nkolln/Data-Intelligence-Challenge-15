@@ -32,7 +32,7 @@ def robot_epoch(robot):
     theta = 0.2; # 0.2 1 5
     alpha = .6
     gamma = 0.8; # 0.2 0.5 0.8 1
-    noise = 0.5
+    noise = 0.1
     current_world = robot.grid.cells;
     current_pos = robot.pos;
     shape_w = current_world.shape
@@ -127,6 +127,8 @@ def robot_epoch(robot):
                 if new_loc in lst_taboo:  # Logic to find if there is a doorway
                     count_walls += 1
                     lst_neighbor.append(dir)
+            elif current_world[coord] == 0:
+                rewards[coord] += -.25
         if count_walls == 2 and tuple(map(operator.add, lst_neighbor[0], lst_neighbor[1])) == (
         0, 0):  # If there are two walls next to eachother than treat as door
             rewards[coord] -= 1
@@ -148,13 +150,13 @@ def robot_epoch(robot):
         cur_pos = current_pos
         cur_state,cur_dir,cur_num = get_info(cur_pos, dct_map, moves,moves_actual,actions,noise,Q)
         it_inner = 0
-        while it_inner < 15:
+        while it_inner < 30:
             #Choose another step at a random direction
             #Add clause to choose actual best at random
             nxt_state_actual = tuple(map(operator.add, cur_pos, cur_dir))
             nxt_state,nxt_dir,nxt_num = get_info(nxt_state_actual, dct_map, moves,moves_actual,actions,noise,Q)
             #Update Q according to the new values
-            Q[cur_state, cur_num] = Q[cur_state, cur_num] + alpha * (rewards[cur_pos] + gamma * Q[nxt_state, nxt_num] - Q[cur_state, cur_num])
+            Q[cur_state, cur_num] = Q[cur_state, cur_num] + alpha * (rewards[nxt_state_actual] + gamma * Q[nxt_state, nxt_num] - Q[cur_state, cur_num])
             #save the new step as the current
             cur_state = nxt_state
             cur_dir = nxt_dir
