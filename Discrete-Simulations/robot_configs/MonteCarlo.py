@@ -194,7 +194,7 @@ def test_pi(robot, policy, iter_count):
         efficiencies.append(efficiency)
         cleaned.append(clean)
 
-    return mean(efficiencies), mean(clean)
+    return mean(efficiencies), mean(cleaned)
 
 # returns the indices of all the dirty cells of the grid as tuples
 def get_dirty_cells(robot):

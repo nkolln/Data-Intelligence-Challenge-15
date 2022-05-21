@@ -37,7 +37,7 @@ for epsilon, grid_file in product(epsilons, grid_files):
 
     efficiency, clean = MC.test_pi(robot, policy, iter_count=5)
     results['efficiency'].append(efficiency)
-    results['clean'].append(clean)
+    results['cleaned'].append(clean)
     
 df = pd.DataFrame.from_dict(results)
 df.to_csv('results-MC-hyperparameter-search.csv')
