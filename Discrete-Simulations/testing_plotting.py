@@ -3,14 +3,27 @@ import pandas as pd
 import numpy as np
 import scipy.stats as st
 
-bots = ['greedy-random-robot']
-grids = ['empty.grid', 'wall-furniture.grid',
-         'example-random-house-0.grid', 'rooms-with-furniture.grid']
+bots = ['Q-learning','SARSA']
+grids = ['empty.grid','example-random-house-0.grid', 'rooms-with-furniture.grid']
 
+#%% Find best hyperparameters
+per_bot = pd.read_csv('results-hyperparameter-search.csv').groupby('bot')
+Ql = per_bot.get_group('Q-learning')
+sarsa = per_bot.get_group('SARSA')
+
+mean_metrics_ql = Ql.groupby(['gamma','alpha','epsilon']).mean()
+mean_metrics_sarsa = sarsa.groupby(['gamma','alpha','epsilon']).mean()
+print("Q-learning:")
+print(mean_metrics_ql.idxmax()) #gamma: 0.5, alpha: 0.8, epsilon: 0.5
+print("SARSA:")
+print(mean_metrics_sarsa.idxmax()) #gamma: 0.8, alpha: 0.2, epsilon: 0.5
+
+#%%
 df = pd.read_csv('results.csv')
 grouped_by_bots = df.groupby(df.bot)
-battery_runs = df.groupby(df.battery).get_group(True)
-battery_runs_grouped_by_bots = battery_runs.groupby(df.bot)
+# battery_runs = df.groupby(df.battery).get_group(True)
+# battery_runs_grouped_by_bots = battery_runs.groupby(df.bot)
+
 
 #%% average efficiency per bot
 #calculate mean efficiencies per bot
