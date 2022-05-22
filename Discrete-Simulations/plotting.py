@@ -13,8 +13,7 @@ elif len(argv) > 1 and argv[1]=='main-results':
 elif len(argv) > 1:
     raise Exception(f"Do not recognize argument {argv[1]}")
 else:
-    hyperparameters =  True
-    main_results = True
+    raise Exception("Please give 1 argument. Possible arguments are 'hyperparameters' and 'main-results'")
 
 
 #%% Find best hyperparameters
