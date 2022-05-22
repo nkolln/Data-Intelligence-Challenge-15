@@ -4,7 +4,6 @@ import robot_configs.sarsa as sarsa
 import robot_configs.qlearning as ql
 import pickle
 from environment import Robot
-#import matplotlib.pyplot as plt
 
 import time
 import pandas as pd
@@ -13,8 +12,9 @@ from tqdm import tqdm
 import multiprocessing
 from sys import argv
 
+#ensure command line arguments can be passed with no issue
 if len(argv) > 1 and argv[1] == 'baseline':
-    #about 6 min runtime
+    #run tests with greedy random robot, takes about 6 min with 4 cores
     bot_funcs = [grr.robot_epoch]
     bot_labels = ['greedy-random-robot']
     grid_files = ['empty.grid','example-random-house-0.grid','rooms-with-furniture.grid']
@@ -25,7 +25,7 @@ if len(argv) > 1 and argv[1] == 'baseline':
     nr_iters = 90
 
 elif len(argv) > 1 and argv[1] == 'hyperparameter-search':
-    #about 1.5h runtime (45 min per algorithm)
+    #tests different hyperparameter settings for SARSA and Q-learning, with 4 cores about 1.5h runtime (45 min per algorithm)
     bot_funcs = [ql.robot_epoch, sarsa.robot_epoch]
     bot_labels = ['Q-learning', 'SARSA']
     grid_files = ['empty.grid', 'example-random-house-0.grid', 'rooms-with-furniture.grid'] #81, 89, 90
@@ -34,16 +34,13 @@ elif len(argv) > 1 and argv[1] == 'hyperparameter-search':
     epsilons = [0.2, 0.5, 0.8]
     runs = list(range(5))
     nr_iters = 810
-    
-elif len(argv) > 1 and argv[1] == 'MC':
-    pass
 
 elif len(argv) > 1 and argv[1] == 'QL-SARSA-test':
-    #about 20 min runtime (10 min per algorithm)
+    #Run tests with the best hyperparameter setting for SARSA and Q-learning, takes about 20 min with 4 cores
     bot_funcs = [ql.robot_epoch, sarsa.robot_epoch]
     bot_labels = ['Q-learning', 'SARSA']
     grid_files = ['empty.grid', 'example-random-house-0.grid', 'rooms-with-furniture.grid'] #81, 89, 90
-    gammas = [0]
+    gammas = [0] #these are filled in later in the code
     alphas = [0]
     epsilons = [0]
     runs = list(range(30))
@@ -52,35 +49,48 @@ elif len(argv) > 1 and argv[1] == 'QL-SARSA-test':
 elif len(argv) > 1:
     raise Exception(f"Unknown argument {argv[1]}")
     
+elif len(argv) <= 1:
+    raise Exception("Please provide an argument")
+
+#ensure that number of cores can be defined in the command line
+if len(argv) > 2:
+    nr_cores = int(argv[2])
 else:
-    raise Exception(f"Please provide 1 argument, {len(argv)-1} detected.")
+    nr_cores = 4
 
 
 progress_bar = tqdm(total=nr_iters)
 
 def progress_update(*args):
+    '''
+    Provides updates after each job finishes.
+    '''
     global progress_bar
     progress_bar.update()
 
 def run_test(i):
+    '''
+    Tests a certain bot on a certain grid with certain hyperparameters.
+    
+    :param i: a tuple of (robot_epoch function, grid_file, gamma, alpha, epsilon, run) where run
+    is an int indicating this trial is 'run'th to be done with these parameters.    
+    '''
     global bot_labels
     # Cleaned tile percentage at which the room is considered 'clean':
     stopping_criteria = 100
 
-    # Keep track of some statistics:
-    #efficiencies = []
-    #n_moves = []
     deaths = 0
-    #cleaned = []
     
-    #bot_labels = ['Q-learning', 'SARSA']
     results = {}
+    
+    #extract all the parameters from i
     bot_func = i[0]
     bot_label = bot_labels[bot_funcs.index(bot_func)]
     results['bot'] = bot_label
     grid_file = i[1]
     results['grid'] = grid_file
     
+    #Ensure correct hyperparameters values in case we're in 'QL-SARSA-test' mode
     if i[2] == 0 and bot_label == "Q-learning":
         gamma = 0.5
     elif i[2] == 0 and bot_label == "SARSA":
@@ -112,16 +122,13 @@ def run_test(i):
         grid = pickle.load(f)
     # Calculate the total visitable tiles:
     n_total_tiles = (grid.cells >= 0).sum()
-    # Spawn the robot at (1,1) facing north with battery drainage enabled:
-    # if battery:
-    #     robot = Robot(grid, (1, 1), orientation='n', battery_drain_p=0.25, battery_drain_lam=2)
-    # else:
+    # Spawn the robot at (1,1) facing north with no battery drainage enabled:
     robot = Robot(grid, (1, 1), orientation='n')
     # Keep track of the number of robot decision epochs:
     n_epochs = 0
     
     start = time.time()
-    while time.time() - start <= 25:
+    while time.time() - start <= 25: #cut off the trial at 25s, as described in the report
         n_epochs += 1
         # Do a robot epoch (basically call the robot algorithm once):
         bot_func(robot, alpha, gamma, epsilon)
@@ -156,30 +163,19 @@ if __name__=='__main__':
     
     results = {'bot': [], 'grid':[], 'gamma':[], 'alpha':[], 'epsilon':[],
                'run':[], 'efficiency':[], 'runtime':[], 'cleaned':[]}
-
+    
+    #create a cartesian product of all the parameters we need to test
     parameters = product(bot_funcs, grid_files, gammas, alphas, epsilons, runs)
     
-    #run tests concurrently on 4 cores
-    with multiprocessing.Pool(4) as pool:
+    #run tests concurrently on multiple cores, default 4
+    with multiprocessing.Pool(nr_cores) as pool:
         processes = [pool.apply_async(run_test, args=(x,), callback=progress_update) for x in parameters]
         test_results = [p.get() for p in processes]
     
-    #combine all dictionaries in test_results into one big dict
+    #combine all results that were returned by the different processes
     for k in results.keys():
         results[k] = [d[k] for d in test_results]
-        
+     
+    #save all the results in one csv
     df = pd.DataFrame.from_dict(results)
     df.to_csv(f'results-{argv[1]}.csv', index=False)
-
-# Make some plots:
-# plt.hist(cleaned)
-# plt.title('Percentage of tiles cleaned.')
-# plt.xlabel('% cleaned')
-# plt.ylabel('count')
-# plt.show()
-
-# plt.hist(efficiencies)
-# plt.title('Efficiency of robot.')
-# plt.xlabel('Efficiency %')
-# plt.ylabel('count')
-# plt.show()
