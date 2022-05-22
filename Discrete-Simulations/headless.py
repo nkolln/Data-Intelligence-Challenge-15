@@ -13,15 +13,16 @@ from tqdm import tqdm
 import multiprocessing
 from sys import argv
 
-if len(argv) > 1 and argv[1] == 'test':
+if len(argv) > 1 and argv[1] == 'baseline':
+    #about 6 min runtime
     bot_funcs = [grr.robot_epoch]
     bot_labels = ['greedy-random-robot']
-    grid_files = ['empty.grid']
+    grid_files = ['empty.grid','example-random-house-0.grid','rooms-with-furniture.grid']
     gammas = [0]
     alphas = [0]
     epsilons = [0]
-    runs = list(range(20))
-    nr_iters = 20
+    runs = list(range(30))
+    nr_iters = 90
 
 elif len(argv) > 1 and argv[1] == 'hyperparameter-search':
     #about 1.5h runtime (45 min per algorithm)

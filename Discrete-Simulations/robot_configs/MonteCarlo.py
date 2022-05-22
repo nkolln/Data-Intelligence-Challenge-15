@@ -159,8 +159,7 @@ def run_episode(robot, policy: dict):
     episode = []
     done = False
     clean_percent = 0
-    start_time = time()
-    while not done and time()-start_time <= 25:
+    while not done:
         # state-action-reward for a step
         sar = []
         state = convert_cell_to_state(robot.pos, grid)
@@ -188,13 +187,17 @@ def run_episode(robot, policy: dict):
 def test_pi(robot, policy, iter_count):
     efficiencies = []
     cleaned = []
-    for i in range(iter_count):
-        print("iter ", i)
+    runtimes = []
+    for i in tqdm(range(iter_count)):
+        #print("iter ", i)
+        start = time()
         episode, efficiency, clean = run_episode(robot, policy)
+        end = time()
+        runtimes.append(end-start)
         efficiencies.append(efficiency)
         cleaned.append(clean)
 
-    return mean(efficiencies), mean(cleaned)
+    return mean(efficiencies), mean(cleaned), mean(runtimes)
 
 # returns the indices of all the dirty cells of the grid as tuples
 def get_dirty_cells(robot):

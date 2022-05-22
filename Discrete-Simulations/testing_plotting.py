@@ -11,12 +11,21 @@ per_bot = pd.read_csv('results-hyperparameter-search.csv').groupby('bot')
 Ql = per_bot.get_group('Q-learning')
 sarsa = per_bot.get_group('SARSA')
 
+print("Best performing combination of hyperparameters per algorithm:")
 mean_metrics_ql = Ql.groupby(['gamma','alpha','epsilon']).mean()
 mean_metrics_sarsa = sarsa.groupby(['gamma','alpha','epsilon']).mean()
 print("Q-learning:")
-print(mean_metrics_ql.idxmax()) #gamma: 0.5, alpha: 0.8, epsilon: 0.5
+print(mean_metrics_ql['efficiency'].idxmax()) #gamma: 0.5, alpha: 0.8, epsilon: 0.5
 print("SARSA:")
-print(mean_metrics_sarsa.idxmax()) #gamma: 0.8, alpha: 0.2, epsilon: 0.5
+print(mean_metrics_sarsa['efficiency'].idxmax()) #gamma: 0.8, alpha: 0.2, epsilon: 0.5
+
+MC = pd.read_csv('results-MC-hyperparameter-search.csv')
+mean_metrics_MC = MC.groupby('epsilon').mean()
+print('Monte Carlo:')
+print(mean_metrics_MC['efficiency'].idxmax()) #epsilon: 0.5
+
+#%% Plot performance of different hyperparameters
+
 
 #%%
 df = pd.read_csv('results.csv')
