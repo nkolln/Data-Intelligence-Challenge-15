@@ -120,7 +120,7 @@ def turn_and_move(robot, move: tuple):
         # If we don't have the wanted orientation, rotate clockwise until we do:
         robot.rotate('r')
     # Move:
-    robot.move()
+    robot.move_rotate()
     reward = rewards[robot.pos]
 
     # Calculate some statistics:

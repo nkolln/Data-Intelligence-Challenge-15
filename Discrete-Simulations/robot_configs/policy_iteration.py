@@ -154,4 +154,4 @@ def robot_epoch(robot,theta_value, gamma_value):
     while robot.orientation != best_move:
         robot.rotate('r')
 
-    robot.move()
+    robot.move_rotate()

@@ -48,7 +48,7 @@ def robot_epoch(robot):
     print(f'possible_tiles_one: {possible_tiles_one}')
 
     if all(value == 0 for value in possible_tiles_one.values()):
-        robot.move()
+        robot.move_rotate()
     else:
         move = max(possible_tiles_one, key=possible_tiles_one.get)
         #move = list(possible_tiles.keys())[list(possible_tiles.values()).index(1.0)]
@@ -58,5 +58,5 @@ def robot_epoch(robot):
             # If we don't have the wanted orientation, rotate clockwise until we do:
             # print('Rotating right once.')
             robot.rotate('r')
-        robot.move()
+        robot.move_rotate()
         print('-'*50)

@@ -212,6 +212,6 @@ def robot_epoch(robot, theta_value, gamma_value):
         # print('Rotating right once.')
         robot.rotate('r')
     # print(f'current position: {current_pos}\n move: {move}\nMatrix: {pd.DataFrame(V).T}')
-    robot.move()
+    robot.move_rotate()
     # print(pd.DataFrame(V).T)
     # print('-'*50)

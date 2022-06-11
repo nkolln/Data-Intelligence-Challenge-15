@@ -24,11 +24,11 @@ def robot_epoch(robot):
             # print('Rotating right once.')
             robot.rotate('r')
         # Move:
-        robot.move()
+        robot.move_rotate()
     # If we cannot reach a dirty tile:
     else:
         # If we can no longer move:
-        while not robot.move():
+        while not robot.move_rotate():
             # Check if we died to avoid endless looping:
             if not robot.alive:
                 break
