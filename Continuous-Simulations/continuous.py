@@ -194,7 +194,7 @@ while True:
     for robot in grid.robots:
         # To avoid deadlocks, only try to move alive robots:
         if robot.alive:
-            if not robot.move(p_random=0.05):
+            if not robot.move_rotate(p_random=0.05):
                 robot.direction_vector = (0.1, 0.1)
 grid.plot_grid()
 time.sleep(3)
