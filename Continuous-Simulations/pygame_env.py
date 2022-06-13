@@ -16,6 +16,16 @@ class StaticObstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=pos)
         self.old_rect = self.rect.copy()
 
+class ChargingDock(pygame.sprite.Sprite):
+    def __init__(self, pos, size, groups):
+        super().__init__(groups)
+        self.pos = pos
+        self.size = size
+        self.image = pygame.Surface(size)
+        self.image.fill('yellow')
+
+        self.rect = self.image.get_rect(center=pos)
+        self.old_rect = self.rect.copy()
 
 # class VisionLine(pygame.sprite.Sprite):
 #
@@ -29,7 +39,7 @@ class StaticObstacle(pygame.sprite.Sprite):
 
 
 class Robot(pygame.sprite.Sprite):
-    def __init__(self, groups, obstacles, screen, battery_drain_p, battery_drain_l, speed):
+    def __init__(self, groups, obstacles, charging_dock, screen, battery_drain_p, battery_drain_l, speed):
         super().__init__(groups)
         self.screen = screen
         # image
@@ -45,6 +55,7 @@ class Robot(pygame.sprite.Sprite):
 
         # movement
         self.pos = pygame.math.Vector2(self.rect.topleft)
+        self.initial_pos = None
         self.direction = pygame.math.Vector2((0, -1))  # upwards
         self.speed = speed
         self.obstacles = obstacles
@@ -56,6 +67,8 @@ class Robot(pygame.sprite.Sprite):
 
         self.vision_range = 300
         self.robot_collided = False
+        
+        self.charging_dock = charging_dock
 
         self.battery_percentage = 100
         self.battery_drain_p = battery_drain_p
@@ -178,6 +191,13 @@ class Robot(pygame.sprite.Sprite):
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l) / movement_vector
             else:
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l)
+
+    def charge_battery(self):
+        if self.battery_percentage < 100:
+            self.battery_percentage += np.random.exponential(self.battery_drain_l)
+        
+        if self.battery_percentage > 100:
+            self.battery_percentage = 100
 
     # detects collisions and does not let the robot go into walls
     def collision(self, direction):
@@ -312,6 +332,14 @@ class Robot(pygame.sprite.Sprite):
         # self.set_action_4(action)
         self.move_rotate()
         self.drain_battery(dt, False)
+        
+        #battery charging
+        x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.pos[0] and self.pos[0] < (self.charging_dock.pos[0] + self.charging_dock.size[0] / 2)
+        y_bool = (self.charging_dock.pos[1] - self.charging_dock.size[1] / 2) < self.pos[1] and self.pos[1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
+        if x_bool and y_bool:
+            print("charging battery")
+            self.charge_battery()
+        
         # print("battery perc: ", self.battery_percentage)
 
         if self.direction.magnitude() != 0:

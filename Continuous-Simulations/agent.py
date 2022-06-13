@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pygame
 from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot
+from pygame_env import Environment, StaticObstacle, Robot, ChargingDock
 from model import LinearQNet, QTrainer
 from plotter import plot
 
@@ -131,11 +131,17 @@ def train():
     obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
     obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
     obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
-
-    robot = Robot(all_sprites, collision_sprites, screen, 0.09, 0.5, 5000)
+    charging_dock = ChargingDock((25, 554), (50,50), [all_sprites])
+    
+    robot = Robot(all_sprites, collision_sprites, charging_dock, screen, 0.09, 0.5, 50)
+    
     game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen)
 
     while True:
+        #print("dock pos: " ,charging_dock.pos)
+        #print("dock size: " , charging_dock.size)
+        print("robot pos: " , robot.pos)
+        print("battery percentage", robot.battery_percentage)
         # get old state
         state_old = agent.get_state(game)
 
@@ -152,7 +158,10 @@ def train():
 
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
-
+        
+        #print("Battery: " , robot.battery_percentage)
+        #print("Clean: " , game.clean_percentage)
+        
         if done:
             # train long memory, plot result
             game.reset()
