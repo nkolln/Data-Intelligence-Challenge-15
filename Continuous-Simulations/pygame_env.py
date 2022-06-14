@@ -17,17 +17,6 @@ class StaticObstacle(pygame.sprite.Sprite):
         self.old_rect = self.rect.copy()
 
 
-# class VisionLine(pygame.sprite.Sprite):
-#
-#     def __init__(self, size: tuple, group):
-#         super().__init__(group)
-#         self.size = size
-#         self.image = pygame.Surface(size)
-#         self.rect = self.image.get_rect()
-#
-#         self.pos = pygame.math.Vector2(self.rect.center)
-
-
 class Robot(pygame.sprite.Sprite):
     def __init__(self, groups, obstacles, screen, battery_drain_p, battery_drain_l, speed):
         super().__init__(groups)
@@ -169,13 +158,14 @@ class Robot(pygame.sprite.Sprite):
 
     # drains the battery by lambda given probability
     def drain_battery(self, dt, is_cont):
-        movement_vector = pygame.Vector2(self.direction.x * self.speed * dt, self.direction.y * self.speed * dt).length_squared()
+        movement_vector = pygame.Vector2(self.direction.x * self.speed, self.direction.y * self.speed)
 
         do_battery_drain = np.random.binomial(1, self.battery_drain_p)
         if do_battery_drain == 1 and self.battery_percentage > 0:
-            if movement_vector != 0 and is_cont:
-                # movement_vector = movement_vector.normalize()
-                self.battery_percentage -= np.random.exponential(self.battery_drain_l) / movement_vector
+
+            if movement_vector.length() != 0 and is_cont:
+                movement_vector = movement_vector.normalize()
+                self.battery_percentage -= np.random.exponential(self.battery_drain_l) * movement_vector.magnitude_squared()
             else:
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l)
 
@@ -342,13 +332,13 @@ class Robot(pygame.sprite.Sprite):
         # print("battery perc: ", self.battery_percentage)
 
         # move and check for collisions on x axis
-        self.pos.x += self.direction.x * self.speed * dt
+        self.pos.x += self.direction.x * self.speed
         self.rect.x = round(self.pos.x)
         self.collision('horizontal')
         self.window_collision('horizontal')
 
         # move and check for collisions on y axis
-        self.pos.y += self.direction.y * self.speed * dt
+        self.pos.y += self.direction.y * self.speed
         self.rect.y = round(self.pos.y)
         self.collision('vertical')
         self.window_collision('vertical')
@@ -406,6 +396,7 @@ class Environment:
         self.last_time = time.time()
         self.dt = time.time() - self.last_time
 
+        self.clock = pygame.time.Clock()
         self.reset()
 
 
@@ -568,6 +559,7 @@ class Environment:
 
         # update the environment so the changes can be seen on the screen
         pygame.display.update()
+        self.clock.tick(60)
 
         efficiency = self.calculate_efficiency()
         # print("eff: ",efficiency)

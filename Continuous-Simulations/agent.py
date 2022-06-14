@@ -67,6 +67,7 @@ class Agent:
 
             # check if current location is dirty
             simulation.is_robot_location_dirty(),
+
             simulation.is_robot_vicinity_dirty("up"),
             simulation.is_robot_vicinity_dirty("down"),
             simulation.is_robot_vicinity_dirty("right"),
@@ -85,6 +86,7 @@ class Agent:
             mini_sample = self.memory
 
         states, actions, rewards, next_states, dones = zip(*mini_sample)
+
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
     def train_short_memory(self, state, action, reward, next_state, done):
@@ -93,11 +95,13 @@ class Agent:
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
         self.epsilon = 80 - self.simulation_count
-        final_move = [0, 0, 0, 0,0,0,0,0]
+
+        final_move = [0, 0, 0, 0, 0, 0, 0, 0]
 
         if random.randint(0, 200) < self.epsilon:
             move = random.randint(0, 7)
             final_move[move] = 1
+
         else:
             state0 = torch.tensor(state, dtype=torch.float)
             prediction = self.model(state0)
@@ -166,7 +170,7 @@ def train():
                 record = score
                 agent.model.save()
 
-            print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency)
+            print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff record:", eff_record)
 
             plot_scores.append(score)
             total_score += score

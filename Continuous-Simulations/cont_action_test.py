@@ -23,7 +23,7 @@ obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
 obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
 
 # init robot object. First 3 inputs are pygame stuff
-robot = Robot(all_sprites, collision_sprites, screen, battery_drain_p=0.1, battery_drain_l=2, speed=5000)
+robot = Robot(all_sprites, collision_sprites, screen, battery_drain_p=0.1, battery_drain_l=2, speed=60)
 
 env = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen)
 
@@ -31,16 +31,18 @@ simulation_count = 0
 total_score = 0
 record = 0
 eff_record = 0
-move_range = numpy.arange(-1, 2)
+move_range = numpy.arange(-1, 1, 0.1)
 
 plot_scores = []
 plot_mean_scores = []
 
 while True:
 
-    move_x = random.choice([-1, 0, 1])
-    move_y = random.choice([-1, 0, 1])
-    reward, done, score, efficiency = env.cont_step(move_x, move_y, True)
+    # move_x = random.choice([-1, 0, 1])
+    # move_y = random.choice([-1, 0, 1])
+    move_x = random.choice(move_range)
+    move_y = random.choice(move_range)
+    reward, done, score, efficiency = env.cont_step(move_x, move_y, False)
 
     if done:
         env.reset()
@@ -53,7 +55,7 @@ while True:
 
         simulation_count += 1
 
-        print('Game', simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency)
+        print('Game', simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff Record: ",eff_record)
 
         plot_scores.append(score)
         total_score += score
