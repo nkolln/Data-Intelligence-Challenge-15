@@ -17,10 +17,35 @@ We use Q-dictionary of format:
       ...}
 '''
 
+ROBOT_SIZE = (33,33)
 Q = {}
 state = []
 
-def reward_func(state, obs_vic, action):
+def get_robot_checkpoints(center, ROBOT_SIZE):
+    '''
+    Takes center point of a square robot and returns checkpoints used to test overlap with obstacles
+    '''
+    x,y = center
+    half_width = ROBOT_SIZE[0]//2
+    half_height = ROBOT_SIZE[1]//2
+    quart_width = half_width//2
+    quart_height = half_height//2
+    roomba_points = [(x,y),(x+half_width,y),(x-half_width,y),(x,y+half_height),(x,y-half_height),
+                     (x+half_width,y+half_height),(x-half_width,y+half_height),(x+half_width,y-half_height),(x-half_width,y-half_height),
+                     (x+quart_width,y+quart_height),(x-quart_width,y+quart_height),(x+quart_width,y-quart_height),(x-quart_width,y-quart_height)]
+    return roomba_points
+
+def get_robot_surrounding(center, ROBOT_SIZE):
+    x,y = center
+    half_width = ROBOT_SIZE[0]//2
+    half_height = ROBOT_SIZE[1]//2
+    roomba_surrounding = [(x+half_width+1,y),(x-half_width-1,y),(x,y+half_height+1),(x,y-half_height-1),
+                        (x+half_width+1,y+half_height+1),(x-half_width-1,y+half_height+1),
+                        (x+half_width+1,y-half_height-1),(x-half_width-1,y-half_height-1)]
+    return roomba_surrounding
+
+
+def reward_func(state, env, action):
     '''
     calculate reward based on the given state and action
     
@@ -31,45 +56,46 @@ def reward_func(state, obs_vic, action):
     :return: reward for the state-action pair, efficiency so far
     '''
     reward = 0
-    #1. obstacle check: action should not be closer than 0.5 (robot radius) to an obstacle
-    for o in obs_vic:
-        if o < 0.5:         #if the robot would bump into the obstacle when making this move
-            reward -= 5000  #discourage! No bumping!
-        if o == 0.5:        #if the robot is flush against the obstacle
-            reward += 5     #encourage getting nooks and crannies
+    #1. obstacle check: action should not overlap an obstacle, preferably
+    #check 8 points surrounding the roomba (corners and middle edges), and 5 extra center points to cover corner cases
+    roomba_points = get_robot_checkpoints(action, ROBOT_SIZE)
+    for rp in roomba_points: #check if roomba points do not intercept obstacles
+        if env.is_obstacle(rp):
+            reward -= 5000
+            
+    #check the parameter of the roomba for obstacles, to encourage getting into nooks and crannies
+    roomba_surrounding = get_robot_surrounding(action, ROBOT_SIZE)
+    for rs in roomba_surrounding:
+        if env.is_obstacle(rs):
+            reward += 5
     
-    # distances_from_obstacles = distance_matrix(obs, action.reshape(1,2)) #calculate euclidean distances from obstacles
-    
-    # #how many obstacles would the robot collide with when taking this action?
-    # collisions = distances_from_obstacles < 0.5
-    # nr_of_collisions = np.sum(collisions)
-    # reward -= nr_of_collisions * 5000 #colliding should be absolutely impossible!!
-    
-    # #how many obstacles is it flush against when taking this action?
-    # perf_obstacles = distances_from_obstacles == 0.5
-    # nr_of_perf_obstacles = np.sum(perf_obstacles)
-    # reward += nr_of_perf_obstacles * 5 #encourage getting into nooks and crannies
-
+    edges = roomba_points[1:5]
     #2. check it doesn't re-visit tiles: action should not be closer than 1 (robot diameter) to a previous position
-    distances_from_previous = distance_matrix(state, action.reshape(1,2)) #euclidean distances from previous positions
+    for prev_point in state:
+        if prev_point in edges: #overlap
+            reward -= 5
+        elif prev_point == action: #revisit
+            reward -= 20
     
-    #How much would the robot overlap with previously cleaned tiles when taking this action?
-    overlap = distances_from_previous < 1
-    overlap_weights = distances_from_previous[overlap]
-    nr_of_overlap = np.sum(overlap)
-    reward -= nr_of_overlap * 10 #discourage overlap, needs to be higher than nooks and crannies reward!
+    # distances_from_previous = distance_matrix(state, action.reshape(1,2)) #euclidean distances from previous positions
     
-    #To what extent is it perfectly against the border of cleaned areas?
-    perf_previous = distances_from_previous == 1
-    nr_of_perf_prev = np.sum(perf_previous)
-    reward += nr_of_perf_prev * 5 #encourage not leaving strips of uncleaned floor
+    # #How much would the robot overlap with previously cleaned tiles when taking this action?
+    # overlap = distances_from_previous < 1
+    # overlap_weights = distances_from_previous[overlap]
+    # nr_of_overlap = np.sum(overlap)
+    # reward -= nr_of_overlap * 10 #discourage overlap, needs to be higher than nooks and crannies reward!
+    
+    # #To what extent is it perfectly against the border of cleaned areas?
+    # perf_previous = distances_from_previous == 1
+    # nr_of_perf_prev = np.sum(perf_previous)
+    # reward += nr_of_perf_prev * 5 #encourage not leaving strips of uncleaned floor
     
     #3. how much of the room is traversed so far?
-    how_clean = state.shape[0] - np.sum(overlap_weights)
+    #how_clean = state.shape[0] - np.sum(overlap_weights)
     #reward += how_clean
-    efficiency = how_clean / state.shape[0]
+    #efficiency = how_clean / state.shape[0]
         
-    return reward, efficiency
+    return reward #, efficiency
 
             
 def select_action(state_Q, policy, epsilon):
@@ -88,15 +114,19 @@ def select_action(state_Q, policy, epsilon):
     else: #choose action with highest Q-value
         max_actions = [key for key, value in state_Q.items() if value == max(state_Q.values())]
         best_action = np.random.choice(max_actions)
-    return str(best_action)
+    return best_action
 
-def robot_epoch(robot, alpha=0.6, gamma=0.5, epsilon=0.5):
+def take_action(current_pos, action):
+    
+
+def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     global state
     global Q
     #update the state
-    state.append((robot.x, robot.y))
+    current_position = env.robot_location()[0]
+    state.append(current_position)
     #add state to Q-dictionary with arbitrary value
-    moves = [(0,-1,1),(1,0,1),(0,1,1),(-1,0,1),(-1,-1,1),(1,-1,1),(-1,1,1),(1,1,1),
+    moves = [(0,-1,1),(1,0,1),(0,1,1),(-1,0,1),(-1,-1,1),(1,-1,1),(-1,1,1),(1,1,1), #ADD ROBOT_SIZE
              (0,-1,0.5),(1,0,0.5),(0,1,0.5),(-1,0,0.5),(-1,-1,0.5),(1,-1,0.5),(-1,1,0.5),(1,1,0.5)]
     #add current state to Q-dictionary
     Q[state] = {m:0 for m in moves}
@@ -105,9 +135,8 @@ def robot_epoch(robot, alpha=0.6, gamma=0.5, epsilon=0.5):
     for _ in range(200):
         current_state = state.copy()
         for t in range(100):
-            action = select_action(Q[current_state], True, epsilon)
-        
-    
+            action = select_action(Q[current_state], True, epsilon)  
+            action = 
     
     current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape 
     
