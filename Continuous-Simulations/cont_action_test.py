@@ -24,7 +24,7 @@ obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
 obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
 
 # init robot object. First 3 inputs are pygame stuff
-robot = Robot(all_sprites, collision_sprites, screen, battery_drain_p=0.1, battery_drain_l=2, speed=5000)
+robot = Robot(all_sprites, collision_sprites, screen, battery_drain_p=0.1, battery_drain_l=2, speed=500)
 
 env = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen)
 
@@ -39,11 +39,15 @@ plot_mean_scores = []
 
 while True:
 
-    move_x = random.choice([-1, 0, 1])
-    move_y = random.choice([-1, 0, 1])
-    move_x,move_y = cont_act_control.direction_control(environment = env,coord=(2,2),mode=0,vis_bool=False,neighbors=20,size_rand=300,step_size=2)
-    reward, done, score, efficiency = env.cont_step(move_x, move_y, True)
+    move_x = np.random.uniform(-1, 1)
+    move_y = np.random.uniform(-1, 1)
 
+    dc = cont_act_control.direction_control(env,coord = (2,2),mode=-1,vis_bool=False,neighbors=20,size_rand=300,step_size=2)
+    move_x,move_y=dc.generate_vector()
+    print(move_x,move_y)
+    reward, done, score, efficiency = env.cont_step(float(move_x), float(move_y), update_matrix=False)
+    #reward, done, score, efficiency = env.cont_step(float(move_x), float(move_y), True)
+    #break
     if done:
         env.reset()
         print("Eff: ", efficiency)

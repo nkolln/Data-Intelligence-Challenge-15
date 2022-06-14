@@ -5,7 +5,7 @@ from shapely.geometry import Point, LineString
 from pygame_env import Environment, StaticObstacle, Robot
 
 class direction_control():
-    def __init__(self,environment,coord,size_rand,step_size,mode=0,vis_bool=False, col_avg='average',neighbors=5,range_coord=[-1,1],range_val=[0,100],column=0,data_present = False):
+    def __init__(self,environment,coord=(0,0),size_rand=300,step_size=2,mode=0,vis_bool=False, col_avg='average',neighbors=5,range_coord=[-1,1],range_val=[0,100],column=0,data_present = False):
         self.coord=coord
         self.x = coord[0]
         self.y = coord[1]
@@ -37,7 +37,7 @@ class direction_control():
             #normal generation mode
             l_z = []
             for a,b in zip(l_x,l_y):
-                reward, done, score, efficiency = self.env.cont_step(a, b, False)
+                reward, done, score, efficiency = self.env.cont_step(a, b, update_matrix=False)
                 l_z.append(reward)
         elif self.mode==0:
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0.5)and(b>0.5))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
@@ -69,6 +69,7 @@ class direction_control():
 
     def scale_circle(self):
         gpd_data = self.average_values()
+        
         lst_norm_scale = []
         for a,b,r in zip(gpd_data['geometry'].x,gpd_data['geometry'].y,(gpd_data[self.col_avg])):
             lst_norm_scale.append(Point((a-self.x)*r,((b-self.y)*r)))
@@ -114,6 +115,7 @@ class direction_control():
             max_coord, _ = self.get_max_val(gpd_data_copy)
             plt.plot([0+self.x,max_coord.x],[0+self.y,max_coord.y])
             self.vb = False
+        return(vec[0],vec[1])
 
 
 
@@ -128,7 +130,6 @@ class direction_control():
         gpd_data = self.average_values()
         max_id = gpd_data['average'].idxmax()
         vec_x, vec_y = gpd_data.iloc[max_id]['geometry'].x-self.x,gpd_data.iloc[max_id]['geometry'].y-self.y
-        print(vec_x,vec_y)
 
         if self.vb:
             self.visualize_data_in_circle_avg()

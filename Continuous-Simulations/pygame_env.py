@@ -627,7 +627,7 @@ class Environment:
         efficiency = self.calculate_efficiency()
         # print("eff: ", efficiency)
 
-        if self.clean_percentage >= 100 or self.robot.battery_percentage <= 1:
+        if self.clean_percentage >= 100:# or self.robot.battery_percentage <= 1:
             done = True
             return step_reward, done, self.clean_percentage, efficiency
 
