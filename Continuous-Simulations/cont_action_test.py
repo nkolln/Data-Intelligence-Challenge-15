@@ -8,6 +8,7 @@ import pygame
 from pygame_env import Environment, StaticObstacle, Robot
 # from model import LinearQNet, QTrainer
 from plotter import plot
+import cont_act_control
 
 screen = pygame.display.set_mode((800, 600))
 
@@ -40,6 +41,7 @@ while True:
 
     move_x = random.choice([-1, 0, 1])
     move_y = random.choice([-1, 0, 1])
+    move_x,move_y = cont_act_control.direction_control(environment = env,coord=(2,2),mode=0,vis_bool=False,neighbors=20,size_rand=300,step_size=2)
     reward, done, score, efficiency = env.cont_step(move_x, move_y, True)
 
     if done:

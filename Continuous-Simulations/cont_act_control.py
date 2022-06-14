@@ -2,13 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point, LineString
+from pygame_env import Environment, StaticObstacle, Robot
 
 class direction_control():
-    def __init__(self,coord,size_rand,step_size,mode=0,vis_bool=False,col_avg='average',neighbors=5,range_coord=[-1,1],range_val=[0,100],column=0,data_present = False):
+    def __init__(self,environment,coord,size_rand,step_size,mode=0,vis_bool=False, col_avg='average',neighbors=5,range_coord=[-1,1],range_val=[0,100],column=0,data_present = False):
         self.coord=coord
         self.x = coord[0]
         self.y = coord[1]
         self.size_rand=size_rand
+        self.env = environment
         self.mode=mode
         self.sz = step_size
         self.vb = vis_bool
@@ -33,6 +35,10 @@ class direction_control():
         l_x,l_y = np.random.uniform(self.rc1,self.rc2,self.size_rand),np.random.uniform(self.rc1,self.rc2,self.size_rand)
         if self.mode==-1:
             #normal generation mode
+            l_z = []
+            for a,b in zip(l_x,l_y):
+                reward, done, score, efficiency = self.env.cont_step(a, b, False)
+                l_z.append(reward)
         elif self.mode==0:
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0.5)and(b>0.5))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
         elif self.mode==1:
@@ -42,7 +48,7 @@ class direction_control():
         l_ratio = [(self.sz/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
         geometry = [Point(a*r +self.x, b*r+self.y) for a, b,r in zip(l_x, l_y,l_ratio)]
         gpd_data = gpd.GeoDataFrame(l_z,geometry=geometry)
-        #gpd_data['x'] = gpd_data['geometry'].x
+        #gpd_data['x'] = gpd_data['geometry'].x     
         return(gpd_data)
 
     def smallest_points(self):
@@ -108,7 +114,6 @@ class direction_control():
             max_coord, _ = self.get_max_val(gpd_data_copy)
             plt.plot([0+self.x,max_coord.x],[0+self.y,max_coord.y])
             self.vb = False
-        return(vec)
 
 
 
@@ -142,54 +147,3 @@ class direction_control():
         gpd_data = self.generate_data()
         gpd_data.plot(column = self.column,cmap='hot')
         return(gpd_data)
-
-
-
-"""import operator
-
-possible_tiles = {(1,1):1,(2,0):1,(1,0):1,(0,1):3,(0,2):1,(-1,1):0,(-1,0):2,(0,-1):1} #robot.possible_tiles_after_move()
-#possible_tiles_good = {k:v for k,v in possible_tiles.items() if float(v) >= 1}
-possible_tiles_one = {k:v for k,v in possible_tiles.items() if abs(k[0])+abs(k[1])==1}
-print(possible_tiles_one)
-#[sum(abs(k[0])+sum(abs(k[1]))) for k in possible_tiles.keys()]
-farthest_step_vision = max([abs(k[0])+abs(k[1]) for k in possible_tiles.keys()])
-print(farthest_step_vision)
-#cap at 2 for now
-if farthest_step_vision > 2:
-    farthest_step_vision = 2
-#farthest_step_vision = max([abs(k[0])+abs(k[1]) for k in possible_tiles.keys()])
-for i in range(1,farthest_step_vision):
-    for key, val in possible_tiles_one.items():
-        #dct_val = {}
-        lst_val = []
-        possible_tiles_iter = {move:possible_tiles[move] for move in possible_tiles if abs(move[0]) + abs(move[1]) == i + 1}
-        for key_it,val_it in possible_tiles_iter.items():
-            key_new = tuple(map(operator.sub, key_it, key))
-            if(abs(key_new[0])+ abs(key_new[1]) == i):
-                lst_val.append(val_it)
-                print(key_new, key_it, key)
-        print(lst_val)
-        if lst_val:
-            if len(lst_val)!=1:
-                max_val = max(lst_val)
-            else:
-                max_val = lst_val[0]
-        else:
-            max_val = 0
-        
-        if max_val <1:
-            max_val = 0
-        possible_tiles_one.update({key:max_val+val})
-        print(possible_tiles_one)
-
-print(max(possible_tiles_one, key=possible_tiles_one.get))
-print(list(possible_tiles_one.keys())[list(possible_tiles_one.values()).index(1.0)])
-
-#-----------------------------------
-possible_tiles = {(1, -1): -2, (1, 0): 1, (0, 1): 1, (-1, 0): -1}
-print({k:v for k,v in possible_tiles.items() if float(v) < 1})
-print(list(possible_tiles.keys()))
-print(list(possible_tiles.keys())[list(possible_tiles.values()).index(1.0)])
-
-possible_tiles = {move:possible_tiles[move] for move in possible_tiles if abs(move[0]) < 2 and abs(move[1]) < 2}
-print(possible_tiles)"""
