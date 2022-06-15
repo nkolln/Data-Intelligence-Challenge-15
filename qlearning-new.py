@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial import distance_matrix
+import math
 
 '''
 TO DO (10 June): 
@@ -36,6 +37,9 @@ def get_robot_checkpoints(center, ROBOT_SIZE):
     return roomba_points
 
 def get_robot_surrounding(center, ROBOT_SIZE):
+    '''
+    get some pixels surrounding the robot to check its surroundings
+    '''
     x,y = center
     half_width = ROBOT_SIZE[0]//2
     half_height = ROBOT_SIZE[1]//2
@@ -45,36 +49,39 @@ def get_robot_surrounding(center, ROBOT_SIZE):
     return roomba_surrounding
 
 
-def reward_func(state, env, action):
+def reward_func(state, env, future_pos):
     '''
     calculate reward based on the given state and action
     
     :param state: 2d n x 2 numpy array containing the coordinates of each previous step
-    :param obs_vic: list of vicinities of obstacles near the action coordinate
+    :param obs_vic: list of vicinities of obstacles near the future coordinate
     :param action: tuple containing the coordinates of the robot after performing the move
     
     :return: reward for the state-action pair, efficiency so far
     '''
     reward = 0
-    #1. obstacle check: action should not overlap an obstacle, preferably
+    #1. obstacle check: future_pos should not overlap an obstacle, preferably
     #check 8 points surrounding the roomba (corners and middle edges), and 5 extra center points to cover corner cases
-    roomba_points = get_robot_checkpoints(action, ROBOT_SIZE)
+    roomba_points = get_robot_checkpoints(future_pos, ROBOT_SIZE)
     for rp in roomba_points: #check if roomba points do not intercept obstacles
         if env.is_obstacle(rp):
             reward -= 5000
             
     #check the parameter of the roomba for obstacles, to encourage getting into nooks and crannies
-    roomba_surrounding = get_robot_surrounding(action, ROBOT_SIZE)
+    roomba_surrounding = get_robot_surrounding(future_pos, ROBOT_SIZE)
     for rs in roomba_surrounding:
         if env.is_obstacle(rs):
             reward += 5
     
-    edges = roomba_points[1:5]
-    #2. check it doesn't re-visit tiles: action should not be closer than 1 (robot diameter) to a previous position
+    edges = np.array(roomba_points[1:5])
+    corners = np.array(roomba_points[5:9])
+    #2. check it doesn't re-visit tiles: future_pos should not be closer than 1 (robot diameter) to a previous position
     for prev_point in state:
-        if prev_point in edges: #overlap
+        if any(abs(edges - prev_state)[:,0] <= 1) and any(abs(edges - prev_state)[:,1] <= 1): #25% overlap
             reward -= 5
-        elif prev_point == action: #revisit
+        if any(abs(corners - prev_state)[:,0] <= 1) and any(abs(corners - prev_state)[:,0] <= 1): #50% overlap
+            reward -= 10
+        elif all(abs(np.array(prev_point) - future_pos) <= 1): #100% overlap: complete revisit
             reward -= 20
     
     # distances_from_previous = distance_matrix(state, action.reshape(1,2)) #euclidean distances from previous positions
@@ -94,7 +101,6 @@ def reward_func(state, env, action):
     #how_clean = state.shape[0] - np.sum(overlap_weights)
     #reward += how_clean
     #efficiency = how_clean / state.shape[0]
-        
     return reward #, efficiency
 
             
@@ -116,8 +122,18 @@ def select_action(state_Q, policy, epsilon):
         best_action = np.random.choice(max_actions)
     return best_action
 
-def take_action(current_pos, action):
+def take_action(current_pos, action, robot_size):
+    '''
+    Takes the robot's current position, action and size to determine the coordinate it arrives at after performing the action
+    '''
+    x_move,y_move,dist = action
+    robot_width, robot_height = robot_size
+    x,y = current_pos
     
+    x += x_move*dist*robot_size
+    y += y_move*dist*robot_size
+    
+    return x,y
 
 def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     global state
@@ -133,10 +149,26 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     
     #START Q-LEARNING MAIN LOOP
     for _ in range(200):
-        current_state = state.copy()
-        for t in range(100):
-            action = select_action(Q[current_state], True, epsilon)  
-            action = 
+        next_state = state.copy()
+        next_position = current_position
+        terminal = False
+        while not terminal:
+            #choose an action using the policy and Q-values
+            action = select_action(Q[next_state], True, epsilon) 
+            #find the position the robot is in after taking the action
+            next_position = take_action(next_position, action, ROBOT_SIZE)
+            #compute the reward
+            reward = reward_func(next_state, env, next_position)
+            #update the state
+            next_state = next_state.append(next_position)
+            #find the best possible next action that could be taken
+            next_action = select_action(Q[next_state], False, epsilon)
+            
+            #update the Q-dictionary
+            Q[state][action] += alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
+            
+            if 
+            
     
     current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape 
     
