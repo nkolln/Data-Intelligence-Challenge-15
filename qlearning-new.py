@@ -49,7 +49,7 @@ def get_robot_surrounding(center, ROBOT_SIZE):
     return roomba_surrounding
 
 
-def reward_func(state, env, future_pos):
+def reward_func(state, env, future_pos, overlap):
     '''
     calculate reward based on the given state and action
     
@@ -59,6 +59,7 @@ def reward_func(state, env, future_pos):
     
     :return: reward for the state-action pair, efficiency so far
     '''
+    global ROBOT_SIZE
     reward = 0
     #1. obstacle check: future_pos should not overlap an obstacle, preferably
     #check 8 points surrounding the roomba (corners and middle edges), and 5 extra center points to cover corner cases
@@ -73,35 +74,28 @@ def reward_func(state, env, future_pos):
         if env.is_obstacle(rs):
             reward += 5
     
+    #2. check it doesn't re-visit tiles: future_pos should not be closer than 1 (robot diameter) to a previous position
     edges = np.array(roomba_points[1:5])
     corners = np.array(roomba_points[5:9])
-    #2. check it doesn't re-visit tiles: future_pos should not be closer than 1 (robot diameter) to a previous position
     for prev_point in state:
-        if any(abs(edges - prev_state)[:,0] <= 1) and any(abs(edges - prev_state)[:,1] <= 1): #25% overlap
+        if any(abs(edges - prev_point)[:,0] <= 1) and any(abs(edges - prev_point)[:,1] <= 1): #25% overlap
             reward -= 5
-        if any(abs(corners - prev_state)[:,0] <= 1) and any(abs(corners - prev_state)[:,0] <= 1): #50% overlap
+            overlap += 0.25
+        elif any(abs(corners - prev_point)[:,0] <= 1) and any(abs(corners - prev_point)[:,0] <= 1): #50% overlap
             reward -= 10
+            overlap += 0.5
         elif all(abs(np.array(prev_point) - future_pos) <= 1): #100% overlap: complete revisit
             reward -= 20
-    
-    # distances_from_previous = distance_matrix(state, action.reshape(1,2)) #euclidean distances from previous positions
-    
-    # #How much would the robot overlap with previously cleaned tiles when taking this action?
-    # overlap = distances_from_previous < 1
-    # overlap_weights = distances_from_previous[overlap]
-    # nr_of_overlap = np.sum(overlap)
-    # reward -= nr_of_overlap * 10 #discourage overlap, needs to be higher than nooks and crannies reward!
-    
-    # #To what extent is it perfectly against the border of cleaned areas?
-    # perf_previous = distances_from_previous == 1
-    # nr_of_perf_prev = np.sum(perf_previous)
-    # reward += nr_of_perf_prev * 5 #encourage not leaving strips of uncleaned floor
+            overlap += 1
     
     #3. how much of the room is traversed so far?
-    #how_clean = state.shape[0] - np.sum(overlap_weights)
-    #reward += how_clean
-    #efficiency = how_clean / state.shape[0]
-    return reward #, efficiency
+    total_area = env.display_height * env.display_width
+    obstacle_area = sum([obs.size[0]*obs.size[1] for obs in env.obstacles])
+    area_to_be_cleaned = total_area - ostacle_area
+    cleaned_area = (len(state)+1 - overlap)*(ROBOT_SIZE[0]*ROBOT_SIZE[1])
+    cleanliness = cleaned_area / area_to_be_cleaned
+    
+    return reward, cleanliness, overlap
 
             
 def select_action(state_Q, policy, epsilon):
@@ -138,19 +132,21 @@ def take_action(current_pos, action, robot_size):
 def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     global state
     global Q
+    global ROBOT_SIZE
     #update the state
     current_position = env.robot_location()[0]
     state.append(current_position)
     #add state to Q-dictionary with arbitrary value
-    moves = [(0,-1,1),(1,0,1),(0,1,1),(-1,0,1),(-1,-1,1),(1,-1,1),(-1,1,1),(1,1,1), #ADD ROBOT_SIZE
-             (0,-1,0.5),(1,0,0.5),(0,1,0.5),(-1,0,0.5),(-1,-1,0.5),(1,-1,0.5),(-1,1,0.5),(1,1,0.5)]
+    moves = [(1,0,1),(1,-1,1),(0,-1,1),(-1,-1,1),(-1,0,1),(-1,1,1),(0,1,1),(1,1,1),
+             (1,0,0.5),(1,-1,0.5),(0,-1,0.5),(-1,-1,0.5),(-1,0,0.5),(-1,1,0.5),(0,1,0.5),(1,1,0.5)]
     #add current state to Q-dictionary
     Q[state] = {m:0 for m in moves}
     
     #START Q-LEARNING MAIN LOOP
-    for _ in range(200):
+    for _ in range(200): #200 episodes
         next_state = state.copy()
         next_position = current_position
+        overlap = 0
         terminal = False
         while not terminal:
             #choose an action using the policy and Q-values
@@ -158,7 +154,7 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
             #find the position the robot is in after taking the action
             next_position = take_action(next_position, action, ROBOT_SIZE)
             #compute the reward
-            reward = reward_func(next_state, env, next_position)
+            reward, cleaned, overlap = reward_func(next_state, env, next_position, overlap)
             #update the state
             next_state = next_state.append(next_position)
             #find the best possible next action that could be taken
@@ -167,9 +163,26 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
             #update the Q-dictionary
             Q[state][action] += alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
             
-            if 
-            
+            if cleaned >= 0.8:
+                terminal = True
+                
+    #find best move
+    max_actions = [key for key, value in Q[state].items() if value == max(Q[state].values())]
     
-    current_world = robot.grid.cells; current_pos = robot.pos; shape_w = current_world.shape 
+    if len(max_actions) == 1:
+        max_action = max_actions[0]
+    else:
+        max_action = np.random.choice(max_actions)
+    
+    bool_action = [0,0,0,0,0,0,0,0]
+    bool_action[moves.index(max_action)%8] = 1
+    
+    if max_action[2] == 1:
+        env.discrete_step(bool_action)
+        
+    elif max_action[2] == 0.5:
+        env.robot.speed /= 2
+        env.discrete_step(bool_action)
+        env.robot.speed *= 2
     
     
