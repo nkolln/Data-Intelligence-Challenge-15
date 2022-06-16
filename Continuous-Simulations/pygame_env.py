@@ -597,7 +597,8 @@ class Environment:
 
         self.temp_matrix = deepcopy(self.matrix)
         self.copy_robot = None
-        self.copy_sprites.empty()
+        if self.copy_sprites is not None:
+            self.copy_sprites.empty()
         self.temp_step_count = deepcopy(self.step_count)
         self.temp_rep_step_count = deepcopy(self.repeated_step_count)
 
@@ -627,7 +628,7 @@ class Environment:
             robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1]+1,
             self.robot.rect.topleft[0]:self.robot.rect.topright[0]+1]
 
-            for i, value in enumerate(robot_location):
+            for i, value in np.ndenumerate(robot_location):
                 if value == 4:
                     robot_location[i] = 5
                 else:
@@ -653,13 +654,13 @@ class Environment:
         if not obstacle.pos[1]-33 < 0:
             self.matrix[obstacle.pos[1]-33:obstacle.pos[1], obstacle.pos[0]:obstacle.pos[0]+obstacle.size[0]+1] = 4
         # bottom border
-        if not obstacle.rect.bottomleft[1]+34 > self.screen.get_height:
+        if not obstacle.rect.bottomleft[1]+34 > self.screen.get_height():
             self.matrix[obstacle.rect.bottomleft[1]+1:obstacle.rect.bottomleft[1]+34, obstacle.pos[0]:obstacle.pos[0] + obstacle.size[0]] = 4
 
         if not obstacle.pos[0]-33 < 0:
             self.matrix[obstacle.pos[1]:obstacle.pos[1]+obstacle.size[1]+1,obstacle.pos[0]-33:obstacle.pos[0]] = 4
 
-        if not obstacle.rect.topright[0]+34 > self.screen.get_width:
+        if not obstacle.rect.topright[0]+34 > self.screen.get_width():
             self.matrix[obstacle.pos[1]:obstacle.pos[1] + obstacle.size[1]+1, obstacle.rect.topright[0]:obstacle.rect.topright[0]+34] = 4
 
     # sets screen borders to 4. border size is size of the robot (33)
