@@ -136,7 +136,7 @@ def train():
     obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
     obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
 
-    robot = Robot(all_sprites, collision_sprites, screen, 0.09, 0.5, 5000)
+    robot = Robot(all_sprites, collision_sprites, screen, 0.1, 2, 50)
     game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen)
 
     while True:

@@ -28,7 +28,7 @@ class MovingVerticalObstacle(StaticObstacle):
         self.max_down = max_down
         self.old_rect = self.rect.copy()
 
-    def update(self, dt):
+    def update(self):
         self.old_rect = self.rect.copy()  # previous frame
         if self.rect.bottom > self.max_down:
             self.rect.bottom = self.max_down
@@ -39,7 +39,7 @@ class MovingVerticalObstacle(StaticObstacle):
             self.pos.y = self.rect.y
             self.direction.y *= -1
 
-        self.pos.y += self.direction.y * self.speed * dt
+        self.pos.y += self.direction.y * self.speed
         self.rect.y = round(self.pos.y)  # current frame
 
 
@@ -54,7 +54,7 @@ class MovingHorizontalObstacle(StaticObstacle):
         self.speed = speed
         self.old_rect = self.rect.copy()
 
-    def update(self, dt):
+    def update(self):
         self.old_rect = self.rect.copy()
         if self.rect.right > self.max_right:
             self.rect.right = self.max_right
@@ -65,7 +65,7 @@ class MovingHorizontalObstacle(StaticObstacle):
             self.pos.x = self.rect.x
             self.direction.x *= -1
 
-        self.pos.x += self.direction.x * self.speed * dt
+        self.pos.x += self.direction.x * self.speed
         self.rect.x = round(self.pos.x)
 
 
@@ -463,10 +463,10 @@ class Robot(pygame.sprite.Sprite):
                 return
             self.robot_collided = False
 
-    def update(self, dt, action=None, x=None, y=None, is_cont=False):
+    def update(self, action=None, x=None, y=None, is_cont=False):
         # if using continuous action space
         if is_cont:
-            self.cont_update(dt, x, y)
+            self.cont_update( x, y)
             return
         self.old_rect = self.rect.copy()
         # self.input()
@@ -480,18 +480,18 @@ class Robot(pygame.sprite.Sprite):
             self.direction = self.direction.normalize()
         # discrete action
         # if x is None:
-        self.pos.x += self.direction.x * self.speed * dt
+        self.pos.x += self.direction.x * self.speed
         self.rect.x = round(self.pos.x)
         self.collision('horizontal')
         self.window_collision('horizontal')
 
-        self.pos.y += self.direction.y * self.speed * dt
+        self.pos.y += self.direction.y * self.speed
         self.rect.y = round(self.pos.y)
         self.collision('vertical')
         self.window_collision('vertical')
 
     # used for continuous action space
-    def cont_update(self, dt, x, y):
+    def cont_update(self, x, y):
         # y goes to x and x goes to y because pygame uses y-x matrix smh.
         self.old_rect = self.rect.copy()
         self.direction.x = y
@@ -576,7 +576,7 @@ class Environment:
         self.temp_rep_step_count = deepcopy(self.repeated_step_count)
 
         self.last_time = time.time()
-        self.dt = time.time() - self.last_time
+        # self.dt = time.time() - self.last_time
 
         self.clock = pygame.time.Clock()
         self.reset()
@@ -586,10 +586,11 @@ class Environment:
         self.init_matrix()
         self.clean_percentage = self.calc_clean_percentage()
         self.last_time = time.time()
+        self.clock = pygame.time.Clock()
         self.robot.reset_robot()
 
         self.trail_lines = []
-        self.dt = time.time() - self.last_time
+        # self.dt = time.time() - self.last_time
         self.step_count = 0
         self.repeated_step_count = 0
 
@@ -736,8 +737,8 @@ class Environment:
                          self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
                          self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
 
-        next_up_down = self.robot.direction.y * self.robot.speed * self.dt
-        next_right_left = self.robot.direction.x * self.robot.speed * self.dt
+        next_up_down = self.robot.direction.y * self.robot.speed
+        next_right_left = self.robot.direction.x * self.robot.speed
 
         if location == "up" and round(self.robot.rect.topleft[1] - next_up_down) >= 0:
             next_location = self.matrix[
@@ -793,8 +794,8 @@ class Environment:
     def cont_step(self, x, y, update=True):
 
         # set time passed since last step. Used for smooth movement
-        self.dt = time.time() - self.last_time
-        self.last_time = time.time()
+        # self.dt = time.time() - self.last_time
+        # self.last_time = time.time()
         step_reward = 0  # reward for the current step
         done = False  # flag for simulation end
 
@@ -864,7 +865,7 @@ class Environment:
         # drawing and updating the screen
         self.screen.fill(
             'lightblue')  # fills background with specified color. Everytihng including this has to be re-drawn at each step smh.
-        self.all_sprites.update(self.dt, None, x, y,
+        self.all_sprites.update(None, x, y,
                                 True)  # calls the update function of the robot and the obstacles with the given parameters. last input says to call const_update
 
         # reward system
@@ -913,7 +914,7 @@ class Environment:
 
     def discrete_step(self, action, x=None, y=None):
         self.step_count += 1
-        self.dt = time.time() - self.last_time
+        # self.dt = time.time() - self.last_time
         self.last_time = time.time()
         step_reward = 0
         done = False
@@ -925,7 +926,7 @@ class Environment:
 
         # drawing and updating the screen
         self.screen.fill('lightblue')
-        self.all_sprites.update(self.dt, action, x, y, False)
+        self.all_sprites.update( action, x, y, False)
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
             step_reward = 20
@@ -956,6 +957,7 @@ class Environment:
         pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
 
         pygame.display.update()
+        self.clock.tick(60)
 
         efficiency = self.calculate_efficiency()
         # print("eff: ", efficiency)
