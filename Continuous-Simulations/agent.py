@@ -148,7 +148,6 @@ def train():
 
         # perform move and get new state
         reward, done, score, efficiency = game.discrete_step(final_move)
-        # print(reward)
         state_new = agent.get_state(game)
 
         # train short memory

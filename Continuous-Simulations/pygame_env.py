@@ -629,9 +629,9 @@ class Environment:
             self.robot.rect.topleft[0]:self.robot.rect.topright[0]+1]
 
             for i, value in np.ndenumerate(robot_location):
-                if value == 4:
+                if value == 4 or value == 5:
                     robot_location[i] = 5
-                else:
+                elif value != 2:
                     robot_location[i] = 1
 
             self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1] + 1,
