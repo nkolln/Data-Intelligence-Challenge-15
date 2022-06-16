@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pygame, sys, time, random
 from typing import List
@@ -14,6 +16,18 @@ class StaticObstacle(pygame.sprite.Sprite):
         self.image.fill('black')
 
         self.rect = self.image.get_rect(topleft=pos)
+        self.old_rect = self.rect.copy()
+
+
+class ChargingDock(pygame.sprite.Sprite):
+    def __init__(self, pos, size, groups):
+        super().__init__(groups)
+        self.pos = pos
+        self.size = size
+        self.image = pygame.Surface(size)
+        self.image.fill('yellow')
+
+        self.rect = self.image.get_rect(center=pos)
         self.old_rect = self.rect.copy()
 
 
@@ -232,6 +246,17 @@ class RobotCopy(pygame.sprite.Sprite):
         self.window_collision('vertical')
 
 
+# class VisionLine(pygame.sprite.Sprite):
+#
+#     def __init__(self, size: tuple, group):
+#         super().__init__(group)
+#         self.size = size
+#         self.image = pygame.Surface(size)
+#         self.rect = self.image.get_rect()
+#
+#         self.pos = pygame.math.Vector2(self.rect.center)
+
+
 class Robot(pygame.sprite.Sprite):
     def __init__(self, groups, obstacles, screen, battery_drain_p, battery_drain_l, speed):
         super().__init__(groups)
@@ -260,6 +285,7 @@ class Robot(pygame.sprite.Sprite):
 
         self.vision_range = 300
         self.robot_collided = False
+        self.is_charging = False
 
         self.battery_percentage = 100
         self.battery_drain_p = battery_drain_p
@@ -343,6 +369,11 @@ class Robot(pygame.sprite.Sprite):
             self.move_right = True
             self.move_up = True
             self.move_down = False
+        else:
+            self.move_left = False
+            self.move_right = False
+            self.move_up = False
+            self.move_down = False
 
     def move_rotate(self):
 
@@ -373,19 +404,28 @@ class Robot(pygame.sprite.Sprite):
 
     # drains the battery by lambda given probability
     def drain_battery(self, is_cont):
-        movement_vector = pygame.Vector2(self.direction.x * self.speed, self.direction.y * self.speed)
+        if not self.is_charging:
+            movement_vector = pygame.Vector2(self.direction.x * self.speed, self.direction.y * self.speed)
 
-        do_battery_drain = np.random.binomial(1, self.battery_drain_p)
-        if do_battery_drain == 1 and self.battery_percentage > 0:
+            do_battery_drain = np.random.binomial(1, self.battery_drain_p)
+            if do_battery_drain == 1 and self.battery_percentage > 0:
 
-            if movement_vector.length() != 0:
-                # movement_vector = movement_vector.normalize()
-                self.battery_percentage -= np.random.exponential(
-                    self.battery_drain_l) * (movement_vector.length_squared()/10000)
-                print("l sqr",movement_vector.length_squared())
-                print("m sqr",movement_vector.magnitude_squared())
-            else:
-                self.battery_percentage -= np.random.exponential(self.battery_drain_l)
+                if movement_vector.length() != 0:
+                    # movement_vector = movement_vector.normalize()
+                    self.battery_percentage -= np.random.exponential(
+                        self.battery_drain_l) * (movement_vector.length_squared() / 10000)
+                    # print("l sqr",movement_vector.length_squared())
+                    # print("m sqr",movement_vector.magnitude_squared())
+                else:
+                    self.battery_percentage -= np.random.exponential(self.battery_drain_l)
+
+    def charge_battery(self):
+        self.is_charging = True
+        if self.battery_percentage < 100:
+            self.battery_percentage += np.random.exponential(self.battery_drain_l)
+
+        if self.battery_percentage > 100:
+            self.battery_percentage = 100
 
     # detects collisions and does not let the robot go into walls
     def collision(self, direction):
@@ -472,7 +512,10 @@ class Robot(pygame.sprite.Sprite):
             return
         self.old_rect = self.rect.copy()
         # self.input()
-        self.set_action_8(action)
+        if self.is_charging:
+            self.set_action_8([0, 0, 0, 0, 0, 0, 0, 0])  # don't move if charging
+        else:
+            self.set_action_8(action)
         # self.set_action_4(action)
         self.move_rotate()
         self.drain_battery(False)
@@ -545,7 +588,8 @@ class Robot(pygame.sprite.Sprite):
 
 
 class Environment:
-    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], all_sprites, collision_sprites, screen,
+    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], charging_dock, all_sprites, collision_sprites,
+                 screen,
                  copy_sprites=None):
         self.display_width = screen.get_width()
         self.display_height = screen.get_height()
@@ -559,6 +603,7 @@ class Environment:
         self.robot = robot
         self.trail_lines = []
         self.obstacles = obstacles
+        self.charging_dock = charging_dock
 
         # matrix representation of the display. Used for clean percentage calculation
         self.matrix = np.array([])
@@ -643,7 +688,7 @@ class Environment:
         robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1] + 1,
                          self.robot.rect.topleft[0]:self.robot.rect.topright[0] + 1]
 
-        for i, value in enumerate(robot_location):
+        for i, value in np.ndenumerate(robot_location):
             if value == 4:
                 robot_location[i] = 5
             else:
@@ -713,6 +758,7 @@ class Environment:
             clean_count = np.count_nonzero(self.matrix == 1)
             clean_count += np.count_nonzero(self.matrix == 5)
             dirty_count = np.count_nonzero(self.matrix == 0)
+            dirty_count += np.count_nonzero(self.matrix == 4)
             clean_percentage = (clean_count / (clean_count + dirty_count)) * 100
             # print("clean percentage: ", clean_percentage)
             return clean_percentage
@@ -720,6 +766,7 @@ class Environment:
         clean_count = np.count_nonzero(self.temp_matrix == 1)
         clean_count += np.count_nonzero(self.temp_matrix == 5)
         dirty_count = np.count_nonzero(self.temp_matrix == 0)
+        dirty_count += np.count_nonzero(self.matrix == 4)
         clean_percentage = (clean_count / (clean_count + dirty_count)) * 100
         # print("clean percentage: ", clean_percentage)
         return clean_percentage
@@ -730,14 +777,33 @@ class Environment:
             robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
                              self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(robot_location == 0)
+            dirty += np.count_nonzero(robot_location == 4)
             # print("dirty count: ", dirty)
             return dirty > 0
         robot_location = self.temp_matrix[self.copy_robot.rect.topleft[1]:self.copy_robot.rect.bottomleft[1],
                          self.copy_robot.rect.topleft[0]:self.copy_robot.rect.topright[0]]
         dirty = np.count_nonzero(robot_location == 0)
+        dirty += np.count_nonzero(robot_location == 4)
         # print("dirty count: ", dirty)
         return dirty > 0
 
+    def robot_location_dirty_percentage(self,is_copy=False):
+        if not is_copy:
+            robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+            dirty = np.count_nonzero(robot_location == 0)
+            dirty += np.count_nonzero(robot_location == 4)
+            clean = np.count_nonzero(robot_location == 1)
+            clean += np.count_nonzero(robot_location == 5)
+            return dirty/(dirty+clean)
+
+        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        dirty = np.count_nonzero(robot_location == 0)
+        dirty += np.count_nonzero(robot_location == 4)
+        clean = np.count_nonzero(robot_location == 1)
+        clean += np.count_nonzero(robot_location == 5)
+        return dirty / (dirty + clean)
     # checks if up down left right of the robot is dirty
     def is_robot_vicinity_dirty(self, location):
         robot_location = self.matrix[
@@ -753,6 +819,7 @@ class Environment:
                                 self.robot.rect.bottomleft[1] - next_up_down),
                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
             return dirty > 0
 
         elif location == "down " and round(self.robot.rect.topleft[1] + next_up_down) < self.display_height:
@@ -761,6 +828,8 @@ class Environment:
                                 self.robot.rect.bottomleft[1] + next_up_down),
                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         elif location == "right" and round(self.robot.rect.topleft[0] - next_right_left) >= 0:
@@ -769,6 +838,8 @@ class Environment:
                             round(self.robot.rect.topleft[0] - next_right_left):round(
                                 self.robot.rect.topright[0] - next_right_left)]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         elif location == "left" and round(self.robot.rect.topleft[0] + next_right_left) < self.display_width:
@@ -777,6 +848,8 @@ class Environment:
                             round(self.robot.rect.topleft[0] + next_right_left):round(
                                 self.robot.rect.topright[0] + next_right_left)]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         # if out of bounds
@@ -797,6 +870,26 @@ class Environment:
         robot_center = self.copy_robot.rect.center
         robot_center = (robot_center[1], robot_center[0])  # yx to xy
         return robot_center, robot_location
+
+    # returns the distance between two points
+    def calculate_distance(self, robot: tuple, dock: tuple):
+        return math.hypot(robot[0] - dock[0], robot[1] - dock[1])
+
+    # checks if the robot got closer to the charging dock
+    def is_robot_closer_to_dock(self):
+        robot_center = self.robot.rect.center
+        robot_previous_center = self.robot.old_rect.center
+        dock_center = self.charging_dock.rect.center
+        return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,
+                                                                                            dock_center)
+
+    # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
+    def revert_copy(self):
+        self.temp_matrix = deepcopy(self.matrix)
+        self.temp_step_count = deepcopy(self.step_count)
+        self.temp_rep_step_count = deepcopy(self.repeated_step_count)
+        self.copy_sprites.empty()
+        self.copy_robot = RobotCopy(self.copy_sprites, self.robot)
 
     def cont_step(self, x, y, update=True):
 
@@ -829,7 +922,7 @@ class Environment:
             # reward system
             # if current location is more clean than dirty give low reward, else give high reward
             if self.is_robot_location_dirty(True):
-                step_reward = 20
+                step_reward = (19 * self.robot_location_dirty_percentage(True))+1
                 # print("location dirty")
             else:
                 step_reward = -15
@@ -878,7 +971,7 @@ class Environment:
         # reward system
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
-            step_reward = 20
+            step_reward = (19 * self.robot_location_dirty_percentage()) + 1
             # print("location dirty")
         else:
             step_reward = -15
@@ -936,7 +1029,7 @@ class Environment:
         self.all_sprites.update(action, x, y, False)
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
-            step_reward = 20
+            step_reward = (19 * self.robot_location_dirty_percentage()) + 1
             # print("location dirty")
         else:
             step_reward = -15
@@ -949,6 +1042,18 @@ class Environment:
         self.update_matrix()
 
         self.all_sprites.draw(self.screen)
+
+        # battery charging
+        x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.robot.pos[0] and self.robot.pos[
+            0] < (self.charging_dock.pos[0] + self.charging_dock.size[0] / 2)
+        y_bool = (self.charging_dock.pos[1] - self.charging_dock.size[1] / 2) < self.robot.pos[1] and self.robot.pos[
+            1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
+
+        if x_bool and y_bool and self.robot.battery_percentage < 100:
+            print("charging battery")
+            self.robot.charge_battery()
+        else:
+            self.robot.is_charging = False
 
         # if len(self.robot.vision_lines) <= 0:
         #     self.robot.init_vision_lines()

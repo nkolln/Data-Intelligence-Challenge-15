@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pygame
 from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle
+from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
 from model import LinearQNet, QTrainer
 from plotter import plot
 
@@ -139,8 +139,11 @@ def train():
     obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
     obs7 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
 
+    charging_dock = ChargingDock((25, 554), (50,50), [all_sprites])
+
     robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
-    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], all_sprites, collision_sprites, screen)
+    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], charging_dock, all_sprites, collision_sprites, screen)
+
 
     while True:
         # get old state
