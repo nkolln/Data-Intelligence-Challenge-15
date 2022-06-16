@@ -49,7 +49,7 @@ while True:
     move_y = random.choice(move_range)
 
     # tests the copy robot. switches between copy robot and original robot
-    # copy robot will be seen moving, but when copy is set to false, original robot will keep moving from where it left off.
+    # copy robot will be seen moving, but when copy is set to true, original robot will keep moving from where it left off.
     if iter % 50 == 0:
         copy = not copy
 
