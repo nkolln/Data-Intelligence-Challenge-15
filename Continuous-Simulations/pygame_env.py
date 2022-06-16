@@ -18,6 +18,16 @@ class StaticObstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=pos)
         self.old_rect = self.rect.copy()
 
+class ChargingDock(pygame.sprite.Sprite):
+    def __init__(self, pos, size, groups):
+        super().__init__(groups)
+        self.pos = pos
+        self.size = size
+        self.image = pygame.Surface(size)
+        self.image.fill('yellow')
+
+        self.rect = self.image.get_rect(center=pos)
+        self.old_rect = self.rect.copy()
 
 class MovingVerticalObstacle(StaticObstacle):
     def __init__(self, pos, size, groups, max_up, max_down, speed):
@@ -234,6 +244,17 @@ class RobotCopy(pygame.sprite.Sprite):
         self.window_collision('vertical')
 
 
+# class VisionLine(pygame.sprite.Sprite):
+#
+#     def __init__(self, size: tuple, group):
+#         super().__init__(group)
+#         self.size = size
+#         self.image = pygame.Surface(size)
+#         self.rect = self.image.get_rect()
+#
+#         self.pos = pygame.math.Vector2(self.rect.center)
+
+
 class Robot(pygame.sprite.Sprite):
     def __init__(self, groups, obstacles, screen, battery_drain_p, battery_drain_l, speed):
         super().__init__(groups)
@@ -262,6 +283,8 @@ class Robot(pygame.sprite.Sprite):
 
         self.vision_range = 300
         self.robot_collided = False
+        
+
 
         self.battery_percentage = 100
         self.battery_drain_p = battery_drain_p
@@ -388,6 +411,13 @@ class Robot(pygame.sprite.Sprite):
                 # print("m sqr",movement_vector.magnitude_squared())
             else:
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l)
+
+    def charge_battery(self):
+        if self.battery_percentage < 100:
+            self.battery_percentage += np.random.exponential(self.battery_drain_l)
+        
+        if self.battery_percentage > 100:
+            self.battery_percentage = 100
 
     # detects collisions and does not let the robot go into walls
     def collision(self, direction):
@@ -547,7 +577,7 @@ class Robot(pygame.sprite.Sprite):
 
 
 class Environment:
-    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], all_sprites, collision_sprites, screen,
+    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], charging_dock, all_sprites, collision_sprites, screen,
                  copy_sprites=None):
         self.display_width = screen.get_width()
         self.display_height = screen.get_height()
@@ -561,6 +591,7 @@ class Environment:
         self.robot = robot
         self.trail_lines = []
         self.obstacles = obstacles
+        self.charging_dock = charging_dock
 
         # matrix representation of the display. Used for clean percentage calculation
         self.matrix = np.array([])
@@ -802,14 +833,13 @@ class Environment:
 
     # returns the distance between two points
     def calculate_distance(self, robot: tuple, dock: tuple):
-
         return math.hypot(robot[0]-dock[0], robot[1]-dock[1])
 
     # checks if the robot got closer to the charging dock
     def is_robot_closer_to_dock(self):
         robot_center = self.robot.rect.center
         robot_previous_center = self.robot.old_rect.center
-        dock_center = self.dock.rect.center
+        dock_center = self.charging_dock.rect.center
         return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,dock_center)
 
     # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
@@ -972,6 +1002,15 @@ class Environment:
         self.update_matrix()
 
         self.all_sprites.draw(self.screen)
+        
+
+        #battery charging
+        x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.robot.pos[0] and self.robot.pos[0] < (self.charging_dock.pos[0] + self.charging_dock.size[0] / 2)
+        y_bool = (self.charging_dock.pos[1] - self.charging_dock.size[1] / 2) < self.robot.pos[1] and self.robot.pos[1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
+        
+        if x_bool and y_bool:
+            print("charging battery")
+            self.robot.charge_battery()
 
         # if len(self.robot.vision_lines) <= 0:
         #     self.robot.init_vision_lines()
