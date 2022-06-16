@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pygame, sys, time, random
 from typing import List
@@ -382,8 +384,8 @@ class Robot(pygame.sprite.Sprite):
                 # movement_vector = movement_vector.normalize()
                 self.battery_percentage -= np.random.exponential(
                     self.battery_drain_l) * (movement_vector.length_squared()/10000)
-                print("l sqr",movement_vector.length_squared())
-                print("m sqr",movement_vector.magnitude_squared())
+                # print("l sqr",movement_vector.length_squared())
+                # print("m sqr",movement_vector.magnitude_squared())
             else:
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l)
 
@@ -643,7 +645,7 @@ class Environment:
         robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1] + 1,
                          self.robot.rect.topleft[0]:self.robot.rect.topright[0] + 1]
 
-        for i, value in enumerate(robot_location):
+        for i, value in np.ndenumerate(robot_location):
             if value == 4:
                 robot_location[i] = 5
             else:
@@ -797,6 +799,27 @@ class Environment:
         robot_center = self.copy_robot.rect.center
         robot_center = (robot_center[1], robot_center[0])  # yx to xy
         return robot_center, robot_location
+
+    # returns the distance between two points
+    def calculate_distance(self, robot: tuple, dock: tuple):
+
+        return math.hypot(robot[0]-dock[0], robot[1]-dock[1])
+
+    # checks if the robot got closer to the charging dock
+    def is_robot_closer_to_dock(self):
+        robot_center = self.robot.rect.center
+        robot_previous_center = self.robot.old_rect.center
+        dock_center = self.dock.rect.center
+        return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,dock_center)
+
+    # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
+    def revert_copy(self):
+        self.temp_matrix = deepcopy(self.matrix)
+        self.temp_step_count = deepcopy(self.step_count)
+        self.temp_rep_step_count = deepcopy(self.repeated_step_count)
+        self.copy_sprites.empty()
+        self.copy_robot = RobotCopy(self.copy_sprites, self.robot)
+
 
     def cont_step(self, x, y, update=True):
 

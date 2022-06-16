@@ -54,6 +54,7 @@ while True:
         copy = not copy
 
     reward, done, score, efficiency = env.cont_step(move_x, move_y, copy)
+
     iter += 1
     if done:
         env.reset()
