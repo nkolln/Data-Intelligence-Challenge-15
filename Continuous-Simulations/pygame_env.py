@@ -758,6 +758,7 @@ class Environment:
             clean_count = np.count_nonzero(self.matrix == 1)
             clean_count += np.count_nonzero(self.matrix == 5)
             dirty_count = np.count_nonzero(self.matrix == 0)
+            dirty_count += np.count_nonzero(self.matrix == 4)
             clean_percentage = (clean_count / (clean_count + dirty_count)) * 100
             # print("clean percentage: ", clean_percentage)
             return clean_percentage
@@ -765,6 +766,7 @@ class Environment:
         clean_count = np.count_nonzero(self.temp_matrix == 1)
         clean_count += np.count_nonzero(self.temp_matrix == 5)
         dirty_count = np.count_nonzero(self.temp_matrix == 0)
+        dirty_count += np.count_nonzero(self.matrix == 4)
         clean_percentage = (clean_count / (clean_count + dirty_count)) * 100
         # print("clean percentage: ", clean_percentage)
         return clean_percentage
@@ -775,14 +777,33 @@ class Environment:
             robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
                              self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(robot_location == 0)
+            dirty += np.count_nonzero(robot_location == 4)
             # print("dirty count: ", dirty)
             return dirty > 0
         robot_location = self.temp_matrix[self.copy_robot.rect.topleft[1]:self.copy_robot.rect.bottomleft[1],
                          self.copy_robot.rect.topleft[0]:self.copy_robot.rect.topright[0]]
         dirty = np.count_nonzero(robot_location == 0)
+        dirty += np.count_nonzero(robot_location == 4)
         # print("dirty count: ", dirty)
         return dirty > 0
 
+    def robot_location_dirty_percentage(self,is_copy=False):
+        if not is_copy:
+            robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+            dirty = np.count_nonzero(robot_location == 0)
+            dirty += np.count_nonzero(robot_location == 4)
+            clean = np.count_nonzero(robot_location == 1)
+            clean += np.count_nonzero(robot_location == 5)
+            return dirty/(dirty+clean)
+
+        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        dirty = np.count_nonzero(robot_location == 0)
+        dirty += np.count_nonzero(robot_location == 4)
+        clean = np.count_nonzero(robot_location == 1)
+        clean += np.count_nonzero(robot_location == 5)
+        return dirty / (dirty + clean)
     # checks if up down left right of the robot is dirty
     def is_robot_vicinity_dirty(self, location):
         robot_location = self.matrix[
@@ -798,6 +819,7 @@ class Environment:
                                 self.robot.rect.bottomleft[1] - next_up_down),
                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
             return dirty > 0
 
         elif location == "down " and round(self.robot.rect.topleft[1] + next_up_down) < self.display_height:
@@ -806,6 +828,8 @@ class Environment:
                                 self.robot.rect.bottomleft[1] + next_up_down),
                             self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         elif location == "right" and round(self.robot.rect.topleft[0] - next_right_left) >= 0:
@@ -814,6 +838,8 @@ class Environment:
                             round(self.robot.rect.topleft[0] - next_right_left):round(
                                 self.robot.rect.topright[0] - next_right_left)]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         elif location == "left" and round(self.robot.rect.topleft[0] + next_right_left) < self.display_width:
@@ -822,6 +848,8 @@ class Environment:
                             round(self.robot.rect.topleft[0] + next_right_left):round(
                                 self.robot.rect.topright[0] + next_right_left)]
             dirty = np.count_nonzero(next_location == 0)
+            dirty += np.count_nonzero(next_location == 4)
+
             return dirty > 0
 
         # if out of bounds
@@ -894,7 +922,7 @@ class Environment:
             # reward system
             # if current location is more clean than dirty give low reward, else give high reward
             if self.is_robot_location_dirty(True):
-                step_reward = 20
+                step_reward = (19 * self.robot_location_dirty_percentage(True))+1
                 # print("location dirty")
             else:
                 step_reward = -15
@@ -943,7 +971,7 @@ class Environment:
         # reward system
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
-            step_reward = 20
+            step_reward = (19 * self.robot_location_dirty_percentage()) + 1
             # print("location dirty")
         else:
             step_reward = -15
@@ -1001,7 +1029,7 @@ class Environment:
         self.all_sprites.update(action, x, y, False)
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
-            step_reward = 20
+            step_reward = (19 * self.robot_location_dirty_percentage()) + 1
             # print("location dirty")
         else:
             step_reward = -15
