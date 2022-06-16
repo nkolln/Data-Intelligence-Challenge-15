@@ -20,7 +20,7 @@ class StaticObstacle(pygame.sprite.Sprite):
 class MovingVerticalObstacle(StaticObstacle):
     def __init__(self, pos, size, groups, max_up, max_down, speed):
         super().__init__(pos, size, groups)
-        self.image.fill('green')
+        self.image.fill('darkgreen')
         self.pos = pygame.math.Vector2(self.rect.topleft)
         self.direction = pygame.math.Vector2((0, 1))
         self.speed = speed
@@ -378,10 +378,12 @@ class Robot(pygame.sprite.Sprite):
         do_battery_drain = np.random.binomial(1, self.battery_drain_p)
         if do_battery_drain == 1 and self.battery_percentage > 0:
 
-            if movement_vector.length() != 0 and is_cont:
-                movement_vector = movement_vector.normalize()
+            if movement_vector.length() != 0:
+                # movement_vector = movement_vector.normalize()
                 self.battery_percentage -= np.random.exponential(
-                    self.battery_drain_l) * movement_vector.magnitude_squared()
+                    self.battery_drain_l) * (movement_vector.length_squared()/10000)
+                print("l sqr",movement_vector.length_squared())
+                print("m sqr",movement_vector.magnitude_squared())
             else:
                 self.battery_percentage -= np.random.exponential(self.battery_drain_l)
 
