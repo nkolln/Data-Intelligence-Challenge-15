@@ -18,6 +18,7 @@ class StaticObstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=pos)
         self.old_rect = self.rect.copy()
 
+
 class ChargingDock(pygame.sprite.Sprite):
     def __init__(self, pos, size, groups):
         super().__init__(groups)
@@ -28,6 +29,7 @@ class ChargingDock(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(center=pos)
         self.old_rect = self.rect.copy()
+
 
 class MovingVerticalObstacle(StaticObstacle):
     def __init__(self, pos, size, groups, max_up, max_down, speed):
@@ -284,8 +286,6 @@ class Robot(pygame.sprite.Sprite):
         self.vision_range = 300
         self.robot_collided = False
         self.is_charging = False
-        
-
 
         self.battery_percentage = 100
         self.battery_drain_p = battery_drain_p
@@ -369,6 +369,11 @@ class Robot(pygame.sprite.Sprite):
             self.move_right = True
             self.move_up = True
             self.move_down = False
+        else:
+            self.move_left = False
+            self.move_right = False
+            self.move_up = False
+            self.move_down = False
 
     def move_rotate(self):
 
@@ -408,7 +413,7 @@ class Robot(pygame.sprite.Sprite):
                 if movement_vector.length() != 0:
                     # movement_vector = movement_vector.normalize()
                     self.battery_percentage -= np.random.exponential(
-                        self.battery_drain_l) * (movement_vector.length_squared()/10000)
+                        self.battery_drain_l) * (movement_vector.length_squared() / 10000)
                     # print("l sqr",movement_vector.length_squared())
                     # print("m sqr",movement_vector.magnitude_squared())
                 else:
@@ -418,7 +423,7 @@ class Robot(pygame.sprite.Sprite):
         self.is_charging = True
         if self.battery_percentage < 100:
             self.battery_percentage += np.random.exponential(self.battery_drain_l)
-        
+
         if self.battery_percentage > 100:
             self.battery_percentage = 100
 
@@ -507,7 +512,10 @@ class Robot(pygame.sprite.Sprite):
             return
         self.old_rect = self.rect.copy()
         # self.input()
-        self.set_action_8(action)
+        if self.is_charging:
+            self.set_action_8([0, 0, 0, 0, 0, 0, 0, 0])  # don't move if charging
+        else:
+            self.set_action_8(action)
         # self.set_action_4(action)
         self.move_rotate()
         self.drain_battery(False)
@@ -580,7 +588,8 @@ class Robot(pygame.sprite.Sprite):
 
 
 class Environment:
-    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], charging_dock, all_sprites, collision_sprites, screen,
+    def __init__(self, robot: Robot, obstacles: List[StaticObstacle], charging_dock, all_sprites, collision_sprites,
+                 screen,
                  copy_sprites=None):
         self.display_width = screen.get_width()
         self.display_height = screen.get_height()
@@ -836,14 +845,15 @@ class Environment:
 
     # returns the distance between two points
     def calculate_distance(self, robot: tuple, dock: tuple):
-        return math.hypot(robot[0]-dock[0], robot[1]-dock[1])
+        return math.hypot(robot[0] - dock[0], robot[1] - dock[1])
 
     # checks if the robot got closer to the charging dock
     def is_robot_closer_to_dock(self):
         robot_center = self.robot.rect.center
         robot_previous_center = self.robot.old_rect.center
         dock_center = self.charging_dock.rect.center
-        return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,dock_center)
+        return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,
+                                                                                            dock_center)
 
     # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
     def revert_copy(self):
@@ -852,7 +862,6 @@ class Environment:
         self.temp_rep_step_count = deepcopy(self.repeated_step_count)
         self.copy_sprites.empty()
         self.copy_robot = RobotCopy(self.copy_sprites, self.robot)
-
 
     def cont_step(self, x, y, update=True):
 
@@ -1005,13 +1014,14 @@ class Environment:
         self.update_matrix()
 
         self.all_sprites.draw(self.screen)
-        
 
-        #battery charging
-        x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.robot.pos[0] and self.robot.pos[0] < (self.charging_dock.pos[0] + self.charging_dock.size[0] / 2)
-        y_bool = (self.charging_dock.pos[1] - self.charging_dock.size[1] / 2) < self.robot.pos[1] and self.robot.pos[1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
-        
-        if x_bool and y_bool:
+        # battery charging
+        x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.robot.pos[0] and self.robot.pos[
+            0] < (self.charging_dock.pos[0] + self.charging_dock.size[0] / 2)
+        y_bool = (self.charging_dock.pos[1] - self.charging_dock.size[1] / 2) < self.robot.pos[1] and self.robot.pos[
+            1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
+
+        if x_bool and y_bool and self.robot.battery_percentage < 100:
             print("charging battery")
             self.robot.charge_battery()
         else:
