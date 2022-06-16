@@ -283,6 +283,7 @@ class Robot(pygame.sprite.Sprite):
 
         self.vision_range = 300
         self.robot_collided = False
+        self.is_charging = False
         
 
 
@@ -398,21 +399,23 @@ class Robot(pygame.sprite.Sprite):
 
     # drains the battery by lambda given probability
     def drain_battery(self, is_cont):
-        movement_vector = pygame.Vector2(self.direction.x * self.speed, self.direction.y * self.speed)
+        if not self.is_charging:
+            movement_vector = pygame.Vector2(self.direction.x * self.speed, self.direction.y * self.speed)
 
-        do_battery_drain = np.random.binomial(1, self.battery_drain_p)
-        if do_battery_drain == 1 and self.battery_percentage > 0:
+            do_battery_drain = np.random.binomial(1, self.battery_drain_p)
+            if do_battery_drain == 1 and self.battery_percentage > 0:
 
-            if movement_vector.length() != 0:
-                # movement_vector = movement_vector.normalize()
-                self.battery_percentage -= np.random.exponential(
-                    self.battery_drain_l) * (movement_vector.length_squared()/10000)
-                # print("l sqr",movement_vector.length_squared())
-                # print("m sqr",movement_vector.magnitude_squared())
-            else:
-                self.battery_percentage -= np.random.exponential(self.battery_drain_l)
+                if movement_vector.length() != 0:
+                    # movement_vector = movement_vector.normalize()
+                    self.battery_percentage -= np.random.exponential(
+                        self.battery_drain_l) * (movement_vector.length_squared()/10000)
+                    # print("l sqr",movement_vector.length_squared())
+                    # print("m sqr",movement_vector.magnitude_squared())
+                else:
+                    self.battery_percentage -= np.random.exponential(self.battery_drain_l)
 
     def charge_battery(self):
+        self.is_charging = True
         if self.battery_percentage < 100:
             self.battery_percentage += np.random.exponential(self.battery_drain_l)
         
@@ -1011,6 +1014,8 @@ class Environment:
         if x_bool and y_bool:
             print("charging battery")
             self.robot.charge_battery()
+        else:
+            self.robot.is_charging = False
 
         # if len(self.robot.vision_lines) <= 0:
         #     self.robot.init_vision_lines()
