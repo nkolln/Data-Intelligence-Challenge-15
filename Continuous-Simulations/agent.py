@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pygame
 from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot
+from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle
 from model import LinearQNet, QTrainer
 from plotter import plot
 
@@ -28,10 +28,10 @@ class Agent:
 
         # points to check if there is an obstacle or a wall. Currently, it sees as far as its size (33,33)
         # 66 is because x and y points are the center of the robot, so it has to use double its size
-        left_vision = (robot.rect.x-66, robot.rect.y)
-        right_vision = (robot.rect.x+66, robot.rect.y)
-        up_vision = (robot.rect.x, robot.rect.y-66)
-        down_vision = (robot.rect.x, robot.rect.y+66)
+        left_vision = (robot.rect.x - 66, robot.rect.y)
+        right_vision = (robot.rect.x + 66, robot.rect.y)
+        up_vision = (robot.rect.x, robot.rect.y - 66)
+        down_vision = (robot.rect.x, robot.rect.y + 66)
 
         # current direction of the robot
         dir_left = robot.move_left
@@ -77,7 +77,8 @@ class Agent:
         return np.array(state, dtype=int)
 
     def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))  # automatically pops left if MAX_MEMORY is reached
+        self.memory.append(
+            (state, action, reward, next_state, done))  # automatically pops left if MAX_MEMORY is reached
 
     def train_long_memory(self):
         if len(self.memory) > BATCH_SIZE:
@@ -108,9 +109,9 @@ class Agent:
             move = torch.argmax(prediction).item()
             final_move[move] = 1
 
-
         # print(final_move)
         return final_move
+
 
 # End of Agent class
 
@@ -135,9 +136,10 @@ def train():
     obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
     obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
     obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
+    obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
 
-    robot = Robot(all_sprites, collision_sprites, screen, 0.1, 2, 50)
-    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen)
+    robot = Robot(all_sprites, collision_sprites, screen, 0.1, 2, 20)
+    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], all_sprites, collision_sprites, screen)
 
     while True:
         # get old state
@@ -169,7 +171,8 @@ def train():
                 record = score
                 agent.model.save()
 
-            print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff record:", eff_record)
+            print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff record:",
+                  eff_record)
 
             plot_scores.append(score)
             total_score += score

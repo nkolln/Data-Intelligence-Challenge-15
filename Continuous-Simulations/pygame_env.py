@@ -28,7 +28,7 @@ class MovingVerticalObstacle(StaticObstacle):
         self.max_down = max_down
         self.old_rect = self.rect.copy()
 
-    def update(self):
+    def update(self, a=None, b=None, c=None, d=None, e=None):
         self.old_rect = self.rect.copy()  # previous frame
         if self.rect.bottom > self.max_down:
             self.rect.bottom = self.max_down
@@ -54,7 +54,7 @@ class MovingHorizontalObstacle(StaticObstacle):
         self.speed = speed
         self.old_rect = self.rect.copy()
 
-    def update(self):
+    def update(self, a=None, b=None, c=None, d=None, e=None):
         self.old_rect = self.rect.copy()
         if self.rect.right > self.max_right:
             self.rect.right = self.max_right
@@ -466,7 +466,7 @@ class Robot(pygame.sprite.Sprite):
     def update(self, action=None, x=None, y=None, is_cont=False):
         # if using continuous action space
         if is_cont:
-            self.cont_update( x, y)
+            self.cont_update(x, y)
             return
         self.old_rect = self.rect.copy()
         # self.input()
@@ -618,16 +618,16 @@ class Environment:
             self.init_obstacle_borders(obstacle)
         # set the cells corresponding to each obstacle in the matrix to 2
         for obstacle in self.obstacles:
-            self.matrix[obstacle.pos[1]:obstacle.pos[1] + obstacle.size[1]+1,
-            obstacle.pos[0]:obstacle.pos[0] + obstacle.size[0]+1] = 2
+            self.matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1] + 1,
+            obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0] + 1] = 2
         # set the cells corresponding to the current robot location to 1 (clean)
         self.set_robot_location()
 
     # set the cells corresponding to the current robot location to 1 (clean). if it is a wall border, it is set to 5
     def set_robot_location(self, is_copy=False):
         if not is_copy:
-            robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1]+1,
-            self.robot.rect.topleft[0]:self.robot.rect.topright[0]+1]
+            robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1] + 1,
+                             self.robot.rect.topleft[0]:self.robot.rect.topright[0] + 1]
 
             for i, value in np.ndenumerate(robot_location):
                 if value == 4 or value == 5:
@@ -649,20 +649,25 @@ class Environment:
 
         self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1] + 1,
         self.robot.rect.topleft[0]:self.robot.rect.topright[0] + 1] = robot_location
+
     # sets the borders of the given obstacle in the matrix representation to 4. border size is the size of the robot (33)
-    def init_obstacle_borders(self, obstacle:StaticObstacle):
+    def init_obstacle_borders(self, obstacle: StaticObstacle):
         # top border
-        if not obstacle.pos[1]-33 < 0:
-            self.matrix[obstacle.pos[1]-33:obstacle.pos[1], obstacle.pos[0]:obstacle.pos[0]+obstacle.size[0]+1] = 4
+        if not obstacle.rect.topleft[1] - 33 < 0:
+            self.matrix[obstacle.rect.topleft[1] - 33:obstacle.rect.topleft[1],
+            obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0] + 1] = 4
         # bottom border
-        if not obstacle.rect.bottomleft[1]+34 > self.screen.get_height():
-            self.matrix[obstacle.rect.bottomleft[1]+1:obstacle.rect.bottomleft[1]+34, obstacle.pos[0]:obstacle.pos[0] + obstacle.size[0]] = 4
+        if not obstacle.rect.bottomleft[1] + 34 > self.screen.get_height():
+            self.matrix[obstacle.rect.bottomleft[1] + 1:obstacle.rect.bottomleft[1] + 34,
+            obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0]] = 4
 
-        if not obstacle.pos[0]-33 < 0:
-            self.matrix[obstacle.pos[1]:obstacle.pos[1]+obstacle.size[1]+1,obstacle.pos[0]-33:obstacle.pos[0]] = 4
+        if not obstacle.rect.topleft[0] - 33 < 0:
+            self.matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1] + 1,
+            obstacle.rect.topleft[0] - 33:obstacle.rect.topleft[0]] = 4
 
-        if not obstacle.rect.topright[0]+34 > self.screen.get_width():
-            self.matrix[obstacle.pos[1]:obstacle.pos[1] + obstacle.size[1]+1, obstacle.rect.topright[0]:obstacle.rect.topright[0]+34] = 4
+        if not obstacle.rect.topright[0] + 34 > self.screen.get_width():
+            self.matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1] + 1,
+            obstacle.rect.topright[0]:obstacle.rect.topright[0] + 34] = 4
 
     # sets screen borders to 4. border size is size of the robot (33)
     def init_screen_borders(self):
@@ -686,8 +691,8 @@ class Environment:
 
             # set the cells corresponding to each obstacle in the matrix to 2
             for obstacle in self.obstacles:
-                self.matrix[obstacle.pos[1]:obstacle.pos[1] + obstacle.size[1] + 1,
-                obstacle.pos[0]:obstacle.pos[0] + obstacle.size[0] + 1] = 2
+                self.matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1] + 1,
+                obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0] + 1] = 2
 
             self.clean_percentage = self.calc_clean_percentage()
             return
@@ -696,8 +701,8 @@ class Environment:
 
         # set obstacle locations to 2 in case robot went through them
         for obstacle in self.obstacles:
-            self.temp_matrix[obstacle.pos[1]:obstacle.pos[1] + obstacle.size[1],
-            obstacle.pos[0]:obstacle.pos[0] + obstacle.size[0]] = 2
+            self.temp_matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1],
+            obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0]] = 2
 
         self.clean_percentage = self.calc_clean_percentage(True)
 
@@ -926,7 +931,7 @@ class Environment:
 
         # drawing and updating the screen
         self.screen.fill('lightblue')
-        self.all_sprites.update( action, x, y, False)
+        self.all_sprites.update(action, x, y, False)
         # if current location is more clean than dirty give low reward, else give high reward
         if self.is_robot_location_dirty():
             step_reward = 20
@@ -977,7 +982,6 @@ class Environment:
         # check obstacles
         for obstacle in self.obstacles:
             if obstacle.rect.collidepoint(point[0], point[1]):
-
                 return True
 
         return False
