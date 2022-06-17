@@ -73,10 +73,10 @@ def reward_func(state, env, future_pos, overlap):
             reward -= 5000
             
     #check the parameter of the roomba for obstacles, to encourage getting into nooks and crannies
-    roomba_surrounding = get_robot_surrounding(future_pos, ROBOT_SIZE)
-    for rs in roomba_surrounding:
-        if env.is_obstacle(rs):
-            reward += 5
+    #roomba_surrounding = get_robot_surrounding(future_pos, ROBOT_SIZE)
+    #for rs in roomba_surrounding:
+    #    if env.is_obstacle(rs):
+    #        reward += 2
     
     #2. check it doesn't re-visit tiles: future_pos should not be closer than 1 (robot diameter) to a previous position
     edges = np.array(roomba_points[1:5])
@@ -117,21 +117,20 @@ def select_action(state_Q, policy, epsilon):
         if min(list(state_Q.values())) <= 0:
             weights = list(state_Q.values()).copy()
             for i in range(len(weights)):
-                weights[i] - min(list(state_Q.values()))
+                weights[i] -= min(list(state_Q.values())) + 1
         else:
             weights = list(state_Q.values())
         choice = random.choices(list(range(len(list(state_Q.keys())))), weights=weights) #choose randomly with Q-value weights
-        best_action = list(state_Q.keys())[choice]
+        best_action = list(state_Q.keys())[choice[0]]
     else: #choose action with highest Q-value
         max_actions = [key for key, value in state_Q.items() if value == max(state_Q.values())]
-        best_action = random.choices(max_actions)
-    return best_action[0]
+        best_action = random.choices(max_actions)[0]
+    return best_action
 
 def take_action(current_pos, action, robot_size):
     '''
     Takes the robot's current position, action and size to determine the coordinate it arrives at after performing the action
     '''
-    print(action)
     x_move,y_move,dist = action
     robot_width, robot_height = robot_size
     x,y = current_pos
@@ -156,15 +155,16 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         Q[tuple(state)] = {m:0 for m in moves}
     
     #START Q-LEARNING MAIN LOOP
-    for _ in range(200): #200 episodes
+    for _ in range(20): #200 episodes
         next_state = state.copy()
+        print(_)
         if tuple(next_state) not in Q.keys(): #initialize if not yet in dict
             Q[tuple(next_state)] = {m:0 for m in moves}
         next_position = current_position
         overlap = 0
         terminal = False
         t = 0
-        while not terminal and t < 100:
+        while not terminal and t < 10:
             t += 1
             #choose an action using the policy and Q-values
             action = select_action(Q[tuple(next_state)], True, epsilon)
@@ -174,6 +174,9 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
             reward, cleaned, overlap = reward_func(next_state, env, next_position, overlap)
             #update the state
             next_state.append(next_position)
+            if tuple(next_state) not in Q.keys():  # initialize if not yet in dict
+                Q[tuple(next_state)] = {m: 0 for m in moves}
+
             #find the best possible next action that could be taken
             next_action = select_action(Q[tuple(next_state)], False, epsilon)
             
@@ -189,7 +192,7 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     if len(max_actions) == 1:
         max_action = max_actions[0]
     else:
-        max_action = np.random.choice(max_actions)
+        max_action = random.choices(max_actions)[0]
     
     bool_action = [0,0,0,0,0,0,0,0]
     bool_action[moves.index(max_action)%8] = 1
