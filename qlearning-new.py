@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.spatial import distance_matrix
 import math
+import pygame
+from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
+
 
 '''
 TO DO (10 June): 
@@ -148,7 +151,9 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         next_position = current_position
         overlap = 0
         terminal = False
-        while not terminal:
+        t = 0
+        while not terminal and t < 100:
+            t += 1
             #choose an action using the policy and Q-values
             action = select_action(Q[next_state], True, epsilon) 
             #find the position the robot is in after taking the action
@@ -163,7 +168,7 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
             #update the Q-dictionary
             Q[state][action] += alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
             
-            if cleaned >= 0.8:
+            if cleaned >= 1:
                 terminal = True
                 
     #find best move
@@ -184,5 +189,36 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         env.robot.speed /= 2
         env.discrete_step(bool_action)
         env.robot.speed *= 2
+        
+
+if __name__=='__main__':
+    screen = pygame.display.set_mode((800, 600))
+
+    all_sprites = pygame.sprite.Group()
+    collision_sprites = pygame.sprite.Group()
+
+    # obstacle setup, random generation will be implemented
+    obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
+    obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
+    obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
+    obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
+    obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
+    obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
+    obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
+    obs7 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
+
+    charging_dock = ChargingDock((25, 554), (50,50), [all_sprites])
+
+    robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
+    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], charging_dock, all_sprites, collision_sprites, screen)
     
-    
+    clean_percent = 0
+    battery_percent = 100
+    while clean_percent < 100 and battery_percent > 0:
+        robot_epoch(game)
+        clean_percent = game.calc_clean_percentage()
+        battery_percent = game.robot.battery_percentage
+        
+    print(clean_percent)
+    print(game.calculate_efficiency())
+        
