@@ -3,6 +3,7 @@ from scipy.spatial import distance_matrix
 import math
 import pygame
 from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
+import random
 
 
 '''
@@ -94,7 +95,7 @@ def reward_func(state, env, future_pos, overlap):
     #3. how much of the room is traversed so far?
     total_area = env.display_height * env.display_width
     obstacle_area = sum([obs.size[0]*obs.size[1] for obs in env.obstacles])
-    area_to_be_cleaned = total_area - ostacle_area
+    area_to_be_cleaned = total_area - obstacle_area
     cleaned_area = (len(state)+1 - overlap)*(ROBOT_SIZE[0]*ROBOT_SIZE[1])
     cleanliness = cleaned_area / area_to_be_cleaned
     
@@ -112,23 +113,31 @@ def select_action(state_Q, policy, epsilon):
     :param epsilon: used in the epsilon-greedy policy, indicates probability of exploration
     '''
     #epsilon-greedy policy
-    if policy and np.random.uniform(0, 1) < epsilon:
-        best_action = np.random.choice(list(state_Q.keys())) #choose randomly with Q-value weights
+    if policy and np.random.uniform(0, 1) < epsilon and (min(list(state_Q.values())) != 0 and max(list(state_Q.values())) != 0):
+        if min(list(state_Q.values())) <= 0:
+            weights = list(state_Q.values()).copy()
+            for i in range(len(weights)):
+                weights[i] - min(list(state_Q.values()))
+        else:
+            weights = list(state_Q.values())
+        choice = random.choices(list(range(len(list(state_Q.keys())))), weights=weights) #choose randomly with Q-value weights
+        best_action = list(state_Q.keys())[choice]
     else: #choose action with highest Q-value
         max_actions = [key for key, value in state_Q.items() if value == max(state_Q.values())]
-        best_action = np.random.choice(max_actions)
-    return best_action
+        best_action = random.choices(max_actions)
+    return best_action[0]
 
 def take_action(current_pos, action, robot_size):
     '''
     Takes the robot's current position, action and size to determine the coordinate it arrives at after performing the action
     '''
+    print(action)
     x_move,y_move,dist = action
     robot_width, robot_height = robot_size
     x,y = current_pos
     
-    x += x_move*dist*robot_size
-    y += y_move*dist*robot_size
+    x += x_move*dist*robot_width
+    y += y_move*dist*robot_height
     
     return x,y
 
@@ -143,7 +152,7 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     moves = [(1,0,1),(1,-1,1),(0,-1,1),(-1,-1,1),(-1,0,1),(-1,1,1),(0,1,1),(1,1,1),
              (1,0,0.5),(1,-1,0.5),(0,-1,0.5),(-1,-1,0.5),(-1,0,0.5),(-1,1,0.5),(0,1,0.5),(1,1,0.5)]
     #add current state to Q-dictionary
-    Q[state] = {m:0 for m in moves}
+    Q[tuple(state)] = {m:0 for m in moves}
     
     #START Q-LEARNING MAIN LOOP
     for _ in range(200): #200 episodes
@@ -155,24 +164,24 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         while not terminal and t < 100:
             t += 1
             #choose an action using the policy and Q-values
-            action = select_action(Q[next_state], True, epsilon) 
+            action = select_action(Q[tuple(next_state)], True, epsilon)
             #find the position the robot is in after taking the action
             next_position = take_action(next_position, action, ROBOT_SIZE)
             #compute the reward
             reward, cleaned, overlap = reward_func(next_state, env, next_position, overlap)
             #update the state
-            next_state = next_state.append(next_position)
+            next_state.append(next_position)
             #find the best possible next action that could be taken
-            next_action = select_action(Q[next_state], False, epsilon)
+            next_action = select_action(Q[tuple(next_state)], False, epsilon)
             
             #update the Q-dictionary
-            Q[state][action] += alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
+            Q[tuple(state)][action] += alpha * (reward + gamma * Q[tuple(next_state)][next_action] - Q[tuple(state)][action])
             
             if cleaned >= 1:
                 terminal = True
                 
     #find best move
-    max_actions = [key for key, value in Q[state].items() if value == max(Q[state].values())]
+    max_actions = [key for key, value in Q[tuple(state)].items() if value == max(Q[tuple(state)].values())]
     
     if len(max_actions) == 1:
         max_action = max_actions[0]
