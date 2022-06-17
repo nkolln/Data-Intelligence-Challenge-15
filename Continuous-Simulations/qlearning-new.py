@@ -152,11 +152,14 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     moves = [(1,0,1),(1,-1,1),(0,-1,1),(-1,-1,1),(-1,0,1),(-1,1,1),(0,1,1),(1,1,1),
              (1,0,0.5),(1,-1,0.5),(0,-1,0.5),(-1,-1,0.5),(-1,0,0.5),(-1,1,0.5),(0,1,0.5),(1,1,0.5)]
     #add current state to Q-dictionary
-    Q[tuple(state)] = {m:0 for m in moves}
+    if tuple(state) not in Q.keys(): #initialize if not yet in dict
+        Q[tuple(state)] = {m:0 for m in moves}
     
     #START Q-LEARNING MAIN LOOP
     for _ in range(200): #200 episodes
         next_state = state.copy()
+        if tuple(next_state) not in Q.keys(): #initialize if not yet in dict
+            Q[tuple(next_state)] = {m:0 for m in moves}
         next_position = current_position
         overlap = 0
         terminal = False
