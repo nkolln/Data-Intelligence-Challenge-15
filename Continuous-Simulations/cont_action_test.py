@@ -5,7 +5,7 @@ import numpy
 import numpy as np
 import pygame
 # from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot
+from pygame_env import Environment, StaticObstacle, Robot, ChargingDock
 # from model import LinearQNet, QTrainer
 from plotter import plot
 
@@ -24,10 +24,11 @@ obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, copy_sprites, collis
 obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, copy_sprites, collision_sprites])
 obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, copy_sprites, collision_sprites])
 
+charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
 # init robot object. First 3 inputs are pygame stuff
 robot = Robot(all_sprites, collision_sprites, screen, battery_drain_p=0.1, battery_drain_l=2, speed=40)
 
-env = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], all_sprites, collision_sprites, screen, copy_sprites)
+env = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6], charging_dock,all_sprites, collision_sprites, screen, copy_sprites)
 
 simulation_count = 0
 total_score = 0
@@ -49,11 +50,15 @@ while True:
     move_y = random.choice(move_range)
 
     # tests the copy robot. switches between copy robot and original robot
-    # copy robot will be seen moving, but when copy is set to false, original robot will keep moving from where it left off.
+    # copy robot will be seen moving, but when copy is set to true, original robot will keep moving from where it left off.
     if iter % 50 == 0:
         copy = not copy
 
     reward, done, score, efficiency = env.cont_step(move_x, move_y, copy)
+
+    if not copy:
+        env.revert_copy()
+    print("reward:",reward)
     iter += 1
     if done:
         env.reset()
