@@ -58,7 +58,8 @@ while True:
 
     if not copy:
         env.revert_copy()
-    print("reward:",reward)
+    # print("reward:",reward)
+    print("Eff: ", efficiency)
     iter += 1
     if done:
         env.reset()

@@ -1,9 +1,12 @@
+from copy import deepcopy
+
 import torch
 import random
 import numpy as np
 import pygame
 from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
+from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, \
+    ChargingDock, random_obstacles
 from model import LinearQNet, QTrainer
 from plotter import plot
 
@@ -20,7 +23,7 @@ class Agent:
         self.gamma = 0.6  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)  # deque allows easy popping from the start if memory get too large
 
-        self.model = LinearQNet(12, 1024, 8)
+        self.model = LinearQNet(13, 1024, 8)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, simulation: Environment):
@@ -67,11 +70,13 @@ class Agent:
 
             # check if current location is dirty
             simulation.is_robot_location_dirty(),
-
+            # check if robot vicinity is dirty
             simulation.is_robot_vicinity_dirty("up"),
             simulation.is_robot_vicinity_dirty("down"),
             simulation.is_robot_vicinity_dirty("right"),
             simulation.is_robot_vicinity_dirty("left"),
+            # check if robot battery is low
+            simulation.is_robot_battery_low(20)
         ]
         # return the state as an array that only contains 0s and 1s
         return np.array(state, dtype=int)
@@ -129,6 +134,8 @@ def train():
     all_sprites = pygame.sprite.Group()
     collision_sprites = pygame.sprite.Group()
 
+    # obstacles = random_obstacles(10, screen, [all_sprites, collision_sprites], 20, 300)
+
     # obstacle setup, random generation will be implemented
     obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
     obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
@@ -136,29 +143,32 @@ def train():
     obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
     obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
     obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
-    obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
-    obs7 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
+    # obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300,
+    #                                 speed=5)
+    # obs8 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
 
-    charging_dock = ChargingDock((25, 554), (50,50), [all_sprites])
+    obstacles = [obs1, obs2, obs3, obs4, obs5, obs6]
+
+    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
 
     robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
-    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], charging_dock, all_sprites, collision_sprites, screen)
-
+    game = Environment(robot, obstacles, charging_dock, all_sprites, collision_sprites, screen)
 
     while True:
         # get old state
         state_old = agent.get_state(game)
-
         # get move
         final_move = agent.get_action(state_old)
 
         # perform move and get new state
         reward, done, score, efficiency = game.discrete_step(final_move)
         state_new = agent.get_state(game)
+        # print(game.robot_location())
 
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
+        # prev = curr
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
 
