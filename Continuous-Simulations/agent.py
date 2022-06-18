@@ -76,7 +76,7 @@ class Agent:
             simulation.is_robot_vicinity_dirty("right"),
             simulation.is_robot_vicinity_dirty("left"),
             # check if robot battery is low
-            simulation.is_robot_battery_low(20)
+            simulation.is_robot_battery_low()
         ]
         # return the state as an array that only contains 0s and 1s
         return np.array(state, dtype=int)

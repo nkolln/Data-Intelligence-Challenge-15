@@ -643,7 +643,7 @@ class Environment:
 
         self.pathfindingMatrix = []
         self.path_finder = None
-        self.path = None
+        self.path = []
 
         self.init_matrix()
         self.clean_percentage = self.calc_clean_percentage()
@@ -675,7 +675,7 @@ class Environment:
         self.robot.reset_robot()
 
         self.path_finder = None
-        self.path = None
+        self.path = []
         self.init_pathfinding_matrix()
 
         self.trail_lines = []
@@ -744,6 +744,20 @@ class Environment:
                          self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
         path = np.count_nonzero(robot_location == 3)
         return path > 0
+
+    # returns the shortest distance to the dock in pixels
+    def distance_to_dock(self):
+        return len(self.path) * 33
+
+    # calculates the minimum battery needed to go to the dock from current position
+    def calculate_minimum_battery(self):
+        dist = self.distance_to_dock()
+        speed = self.robot.speed
+        steps = dist//speed
+
+        battery_consumption = self.robot.battery_drain_l * self.robot.battery_drain_p
+        battery_needed = steps * battery_consumption
+        return battery_needed
 
     # set the cells corresponding to the current robot location to 1 (clean). if it is a wall border, it is set to 5
     def set_robot_location(self, is_copy=False):
@@ -976,9 +990,11 @@ class Environment:
         # return true if more than 3 quarters of the robot are in an obstacle
         return obstacle >= robot_location.size
 
-    # checks if robot battery percentage is lower than the given value
-    def is_robot_battery_low(self, value):
-        return self.robot.battery_percentage < value
+    # checks if robot battery percentage is lower than minimum battery needed to go to the dock
+    def is_robot_battery_low(self):
+        battery_needed = self.calculate_minimum_battery()
+        # print("min battery: ", battery_needed)
+        return self.robot.battery_percentage < battery_needed
 
     # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
     def revert_copy(self):
@@ -1126,13 +1142,11 @@ class Environment:
         self.all_sprites.update(action, x, y, False)
         self.all_sprites.draw(self.screen)
 
-        # find a path to the charging dock if necessary
-        if self.robot.battery_percentage < 20 and self.path_finder is None:
+        # find a path to the charging dock
+        if self.path_finder is None:
             self.path_finder = PathFinder(self.pathfindingMatrix, self.robot, self.charging_dock)
-        if self.path_finder is not None:
-            self.path = self.path_finder.find_path()
-        self.draw_path_to_dock()
-        # print(np.count_nonzero(self.temp_matrix == 3))
+
+        self.path = self.path_finder.find_path()
 
         # reward system
         # if robot goes into an obstacle give bad reward and end simulation
@@ -1143,7 +1157,9 @@ class Environment:
             return step_reward, done, self.clean_percentage, self.calculate_efficiency()
 
         # if battery is low, only focus on going to dock
-        if self.robot.battery_percentage < 20:
+        if self.is_robot_battery_low():
+            print("battery low")
+            self.draw_path_to_dock()
             if self.is_robot_on_path_to_dock():
                 step_reward = 20
             else:
