@@ -662,12 +662,13 @@ class Environment:
 
         self.last_time = time.time()
         # self.dt = time.time() - self.last_time
-
+        self.old_distance = 0
         self.clock = pygame.time.Clock()
         self.reset()
 
     # resets environment so that it can be run again
     def reset(self):
+        self.old_distance = self.distance_to_dock()
         self.init_matrix()
         self.clean_percentage = self.calc_clean_percentage()
         self.last_time = time.time()
@@ -1156,11 +1157,14 @@ class Environment:
             step_reward = -40
             return step_reward, done, self.clean_percentage, self.calculate_efficiency()
 
+        
         # if battery is low, only focus on going to dock
         if self.is_robot_battery_low():
-            print("battery low")
+            #print("battery low")
             self.draw_path_to_dock()
-            if self.is_robot_on_path_to_dock():
+            
+            if self.is_robot_on_path_to_dock() and self.distance_to_dock() < self.old_distance:
+                #print("is on path")
                 step_reward = 20
             else:
                 step_reward = -20
@@ -1179,6 +1183,7 @@ class Environment:
                 step_reward += -5
 
         self.update_matrix()
+        self.old_distance = self.distance_to_dock()
         self.temp_matrix = deepcopy(self.matrix)  # used in pathfinding
 
         # battery charging
@@ -1188,7 +1193,7 @@ class Environment:
             1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
 
         if x_bool and y_bool and self.robot.battery_percentage < 100:
-            print("charging battery")
+            #print("charging battery")
             self.robot.charge_battery()
         else:
             self.robot.is_charging = False
@@ -1210,8 +1215,12 @@ class Environment:
         efficiency = self.calculate_efficiency()
         # print("eff: ", efficiency)
 
-        if self.clean_percentage >= 100 or self.robot.battery_percentage <= 1:
+        if self.clean_percentage >= 95 or self.robot.battery_percentage <= 1:
             done = True
+            if self.robot.battery_percentage <= 1:
+                print("battery died")
+            else:
+                print("cleaned all")
             return step_reward, done, self.clean_percentage, efficiency
 
         return step_reward, done, self.clean_percentage, efficiency

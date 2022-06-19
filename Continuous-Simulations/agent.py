@@ -4,16 +4,19 @@ import torch
 import random
 import numpy as np
 import pygame
+import copy
 from collections import deque
 from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, \
     ChargingDock, random_obstacles
 from model import LinearQNet, QTrainer
 from plotter import plot
 
-MAX_MEMORY = 1_000_000
-BATCH_SIZE = 500
-LR = 0.003
 
+MAX_MEMORY = 5_000_000
+BATCH_SIZE = 500
+LR = 0.001
+
+#np.set_printoptions(threshold=sys.maxsize)
 
 class Agent:
 
@@ -23,7 +26,7 @@ class Agent:
         self.gamma = 0.6  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)  # deque allows easy popping from the start if memory get too large
 
-        self.model = LinearQNet(13, 1024, 8)
+        self.model = LinearQNet(13, 512, 256, 8)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, simulation: Environment):
@@ -100,11 +103,11 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 80 - self.simulation_count
+        self.epsilon = 20 - self.simulation_count
 
         final_move = [0, 0, 0, 0, 0, 0, 0, 0]
 
-        if random.randint(0, 200) < self.epsilon:
+        if random.randint(0, 130) < self.epsilon:
             move = random.randint(0, 7)
             final_move[move] = 1
 
@@ -143,28 +146,32 @@ def train():
     obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
     obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
     obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
-    # obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300,
-    #                                 speed=5)
-    # obs8 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
+    #obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
+    #obs8 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
 
-    obstacles = [obs1, obs2, obs3, obs4, obs5, obs6]
-
-    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
-
+    obstacles = [obs1, obs2, obs3, obs4, obs5, obs6]#, obs7, obs8]
+    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites]) 
     robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
     game = Environment(robot, obstacles, charging_dock, all_sprites, collision_sprites, screen)
 
+    
     while True:
         # get old state
         state_old = agent.get_state(game)
         # get move
         final_move = agent.get_action(state_old)
 
+        previous_matrix = copy.deepcopy(game.matrix)
+        #print(previous_matrix.shape)
         # perform move and get new state
         reward, done, score, efficiency = game.discrete_step(final_move)
         state_new = agent.get_state(game)
         # print(game.robot_location())
 
+        #diff_matrix = np.subtract(current_matrix, previous_matrix)
+        #print("previous: " , previous_matrix)
+        #print("current: " , current_matrix)
+        #print("diff: " , np.count_nonzero(diff_matrix == 1))
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
