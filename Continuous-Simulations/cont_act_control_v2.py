@@ -3,6 +3,7 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point, LineString
 from pygame_env import Environment, StaticObstacle, Robot
+import math
 
 class direction_control():
     def __init__(self,environment,alpha = .5, gamma = 0.5,coord=(0,0),further_step=0,size_rand=300,step_size=2,mode=0,vis_bool=False, col_avg='average',neighbors=5,range_coord=[-1,1],range_val=[0,100],column=0,data_present = False):
@@ -26,87 +27,64 @@ class direction_control():
         self.column = column
         self.data_present = data_present
 
-    #Made for initial testing and Visualization
-    def generate_data_random(self):
-        l_x,l_y = np.random.uniform(self.rc1,self.rc2,self.size_rand),np.random.uniform(self.rc1,self.rc2,self.size_rand)
-        l_z = np.random.uniform(self.rv1,self.rv2,self.size_rand)
-        l_ratio = [(1/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
-        geometry = [Point(a*r, b*r) for a, b,r in zip(l_x, l_y,l_ratio)]
-        gpd_data = gpd.GeoDataFrame(l_z,geometry=geometry)
-        return(gpd_data)
+    #First generate all the possible random moves
+    #Then sample surrounding area in an even 8 area split
+
+    def update_Q(self,reward,next_reward):
+        target = reward + self.gamma * next_reward
+        r_curr = self.alpha * target
+        return(r_curr)
 
     def generate_data(self):
         l_x,l_y = np.random.uniform(self.rc1,self.rc2,self.size_rand),np.random.uniform(self.rc1,self.rc2,self.size_rand)
         if self.mode==-1:
             #normal generation mode
+            #l_x_q,l_y_q = [1,math.sqrt(0.5),0,-math.sqrt(0.5),-1,-math.sqrt(0.5),0,math.sqrt(0.5)],[0,math.sqrt(0.5),1,math.sqrt(0.5),0,-math.sqrt(0.5),-1,-math.sqrt(0.5)]
+            l_x_q,l_y_q = [1,0,-1,0],[0,1,0,-1]
             l_z = []
-            for a,b in zip(l_x,l_y):
+            for i,(a,b) in enumerate(zip(l_x,l_y)):
                 scale = (self.sz/(a**2+ b**2))**0.5
-                a,b = a*scale,b*scale
-                reward_tot, done, score, efficiency = self.env.cont_step(a, b, False)
-                size = np.random.randint(0,self.further_step,1)[0]
-                l_x_temp, l_y_temp = np.random.uniform(self.rc1,self.rc2,size),np.random.uniform(self.rc1,self.rc2,size)
+                l_x[i],l_y[i] = a*scale,b*scale
+                a,b = l_x[i],l_y[i]
+                reward_old = 0
+                size = self.further_step#np.random.randint(0,self.further_step,1)[0]
+                #for j in range(size):
+                for c,d in zip(l_x_q,l_y_q):
+                    reward_curr, _, _, _ = self.env.cont_step(a, b, False)
+                    reward, _, _, _ = self.env.cont_step(c,d, False)
+                    print(f'{reward_curr}  {reward}')
+                    reward_tot = self.update_Q(reward_curr,reward)
+                    print(reward_tot)
+                    if reward_tot>reward_old:
+                        reward_old=reward_tot
+                    self.env.revert_copy()
+                """l_x_temp, l_y_temp = np.random.uniform(self.rc1,self.rc2,size),np.random.uniform(self.rc1,self.rc2,size)
                 for i,(a,b) in enumerate(zip(l_x_temp,l_y_temp)):
                     #a,b = np.random.uniform(self.rc1,self.rc2,1),np.random.uniform(self.rc1,self.rc2,self.size_rand)
                     scale = (self.sz/(a**2+ b**2))**0.5
                     a,b = a*scale,b*scale
                     reward, done, score, efficiency = self.env.cont_step(a, b, False)
-                    reward_tot = reward_tot + (self.alpha**(i+1) * reward )
+                    reward_tot = 
                     #reward_tot = reward + reward_tot
-                    #alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
-                l_z.append(reward_tot)
+                    #alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])"""
+                l_z.append(reward_old)
                 self.env.revert_copy()
 
-        #Modes Beneath were only made for testing before the environment was created
+        #Modes Beneath were made for testing before the environment was created
         elif self.mode==0:
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0.5)and(b>0.5))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
         elif self.mode==1:
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0)and(b>0))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
         elif self.mode==2:
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0)and(b>0))or((a>0)and(b<0)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
-        l_ratio = [(self.sz/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
-        geometry = [Point(a*r +self.x, b*r+self.y) for a, b,r in zip(l_x, l_y,l_ratio)]
+        #l_ratio = [(self.sz/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
+        #print(l_z)
+        geometry = [Point(a +self.x, b+self.y) for a, b in zip(l_x, l_y)]
         gpd_data = gpd.GeoDataFrame(l_z,geometry=geometry)
-        #gpd_data['x'] = gpd_data['geometry'].x     
         return(gpd_data)
 
 
-    #Code to generate the scores of moves in the surrounding area
-    def generate_data_old(self):
-        l_x,l_y = np.random.uniform(self.rc1,self.rc2,self.size_rand),np.random.uniform(self.rc1,self.rc2,self.size_rand)
-        if self.mode==-1:
-            #normal generation mode
-            l_z = []
-            for a,b in zip(l_x,l_y):
-                scale = (self.sz/(a**2+ b**2))**0.5
-                a,b = a*scale,b*scale
-                reward_tot, done, score, efficiency = self.env.cont_step(a, b, False)
-                size = np.random.randint(0,self.further_step,1)[0]
-                l_x_temp, l_y_temp = np.random.uniform(self.rc1,self.rc2,size),np.random.uniform(self.rc1,self.rc2,size)
-                for a,b in zip(l_x_temp,l_y_temp):
-                    #a,b = np.random.uniform(self.rc1,self.rc2,1),np.random.uniform(self.rc1,self.rc2,self.size_rand)
-                    scale = (self.sz/(a**2+ b**2))**0.5
-                    a,b = a*scale,b*scale
-                    reward, done, score, efficiency = self.env.cont_step(a, b, False)
-                    #reward_tot = reward_tot + self.alpha * [reward + self.gamma]
-                    reward_tot = reward + reward_tot
-                    #alpha * (reward + gamma * Q[next_state][next_action] - Q[state][action])
-                l_z.append(reward_tot)
-                self.env.revert_copy()
-
-        #Modes Beneath were only made for testing before the environment was created
-        elif self.mode==0:
-            l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0.5)and(b>0.5))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
-        elif self.mode==1:
-            l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0)and(b>0))or((a>1)and(b>1)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
-        elif self.mode==2:
-            l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0)and(b>0))or((a>0)and(b<0)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
-        l_ratio = [(self.sz/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
-        geometry = [Point(a*r +self.x, b*r+self.y) for a, b,r in zip(l_x, l_y,l_ratio)]
-        gpd_data = gpd.GeoDataFrame(l_z,geometry=geometry)
-        #gpd_data['x'] = gpd_data['geometry'].x     
-        return(gpd_data)
-
+    
     def smallest_points(self):
         gpd_data = self.generate_data()
         lst_return = []
@@ -117,6 +95,8 @@ class direction_control():
 
     def average_values(self):
         lst_sim,gpd_data = self.smallest_points()
+        print(lst_sim,gpd_data)
+        print('-'*100)
         lst_return = []
         for row in lst_sim:
             lst_return.append(gpd_data.iloc[row][self.column].mean())
@@ -161,51 +141,12 @@ class direction_control():
         return(vec[0],vec[1])
 
 
-    def generate_vector_old(self):
-        gpd_data,gpd_data_cut = self.scale_circle()
-        m,b = np.polyfit(gpd_data_cut['geometry'].x, gpd_data_cut['geometry'].y, 1)
-        _,idx = self.get_max_val(gpd_data)
-        coord_best = gpd_data.iloc[idx]['geometry_old']
-        x_c = coord_best.x-self.x
-        y_c = -x_c/m
-        #calculate ratio
-        r = (self.sz/(x_c**2+ y_c**2))**0.5
-        vec = (x_c*r,y_c*r)
-
-        if self.vb:
-            #plt.plot([0,x_c*100],[0,y_c*100])
-            gpd_data_copy = gpd_data.copy()
-
-            #Vis 1
-            gpd_data_copy['geometry'] = gpd_data_copy['geometry_old']
-            self.visualize_data_in_circle_avg(gpd_data_copy)
-            plt.plot([0+self.x,vec[0]+self.x],[0+self.y,vec[1]+self.y])
-            
-            #Vis 2
-            self.data_present = True
-            max_coord, _ = self.get_max_val(gpd_data_copy)
-            plt.plot([0+self.x,max_coord.x],[0+self.y,max_coord.y])
-            self.vb = False
-        return(coord_best.x,coord_best.y)
-        return(vec[0],vec[1])
-
-
-
     def get_max_val(self,data):
         gpd_data = data
         max_id = gpd_data['average'].idxmax()
         ret = gpd_data.iloc[max_id]['geometry']
         return(ret,max_id)
 
-
-    def max_vector(self):
-        gpd_data = self.average_values()
-        max_id = gpd_data['average'].idxmax()
-        vec_x, vec_y = gpd_data.iloc[max_id]['geometry'].x-self.x,gpd_data.iloc[max_id]['geometry'].y-self.y
-
-        if self.vb:
-            self.visualize_data_in_circle_avg()
-            self.vb = False
 
     def visualize_data_in_circle_avg(self,data = None):
         if  self.data_present:

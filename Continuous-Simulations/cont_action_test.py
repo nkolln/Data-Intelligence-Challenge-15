@@ -8,7 +8,7 @@ import pygame
 from pygame_env import Environment, StaticObstacle, Robot, ChargingDock
 # from model import LinearQNet, QTrainer
 from plotter import plot
-import cont_act_control
+import cont_act_control_v2
 
 screen = pygame.display.set_mode((800, 600))
 
@@ -40,25 +40,22 @@ move_range = numpy.arange(-1, 1, 0.1)
 plot_scores = []
 plot_mean_scores = []
 
-copy = False
+copy = True
 
 iter = 0
 while True:
 
     # move_x = random.choice([-1, 0, 1])
     # move_y = random.choice([-1, 0, 1])
-    move_x = random.choice(move_range)
-    move_y = random.choice(move_range)
 
     # tests the copy robot. switches between copy robot and original robot
     # copy robot will be seen moving, but when copy is set to true, original robot will keep moving from where it left off.
-    if iter % 50 == 0:
-        copy = not copy
 
-    dc = cont_act_control.direction_control(env,mode=-1,neighbors=20,size_rand=50,step_size=2,further_step=5)
+
+    dc = cont_act_control_v2.direction_control(env,alpha=1,gamma=0.8,neighbors=1,size_rand=25,step_size=1,further_step=2,mode=-1)
     move_x,move_y=dc.generate_vector()
     reward, done, score, efficiency = env.cont_step(move_x, move_y, copy)
-    print(reward)
+    print(f'Reward: {reward}\tScore: {score}\tEfficiency: {efficiency}')
 
     if not copy:
         env.revert_copy()
