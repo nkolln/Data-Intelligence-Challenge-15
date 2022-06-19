@@ -893,14 +893,16 @@ class Environment:
             dirty += np.count_nonzero(robot_location == 4)
             clean = np.count_nonzero(robot_location == 1)
             clean += np.count_nonzero(robot_location == 5)
+            # print("dirty percentage: ", dirty / (dirty + clean))
             return dirty / (dirty + clean)
 
-        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
-                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        robot_location = self.temp_matrix[self.copy_robot.rect.topleft[1]:self.copy_robot.rect.bottomleft[1],
+                         self.copy_robot.rect.topleft[0]:self.copy_robot.rect.topright[0]]
         dirty = np.count_nonzero(robot_location == 0)
         dirty += np.count_nonzero(robot_location == 4)
         clean = np.count_nonzero(robot_location == 1)
         clean += np.count_nonzero(robot_location == 5)
+        print("dirty percentage: ", dirty / (dirty + clean))
         return dirty / (dirty + clean)
 
     # checks if up down left right of the robot is dirty
@@ -1007,9 +1009,6 @@ class Environment:
 
     def cont_step(self, x, y, update=True):
 
-        # set time passed since last step. Used for smooth movement
-        # self.dt = time.time() - self.last_time
-        # self.last_time = time.time()
         step_reward = 0  # reward for the current step
         done = False  # flag for simulation end
 
@@ -1157,12 +1156,12 @@ class Environment:
             step_reward = -40
             return step_reward, done, self.clean_percentage, self.calculate_efficiency()
 
-        
+
         # if battery is low, only focus on going to dock
         if self.is_robot_battery_low():
             #print("battery low")
             self.draw_path_to_dock()
-            
+
             if self.is_robot_on_path_to_dock() and self.distance_to_dock() < self.old_distance:
                 #print("is on path")
                 step_reward = 20
