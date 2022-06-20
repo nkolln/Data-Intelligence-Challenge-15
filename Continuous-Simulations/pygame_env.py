@@ -1263,24 +1263,24 @@ def generate_room(all_sprites,collision_sprites,screen, type):
 
     if type == "house":
         # full house
-        obs1 = StaticObstacle(pos=(0, screen.get_height() // 2), size=(screen.get_width() // 2 - 100, 25),
+        obs1 = StaticObstacle(pos=(0, screen.get_height() // 2), size=(screen.get_width() // 2 - 100, 45),
                               groups=[all_sprites, collision_sprites])
-        obs2 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 + 80),
-                              size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 + 100),
+                              size=(45, screen.get_height()), groups=[all_sprites, collision_sprites])
 
-        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2 + 80),
-                              size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2 + 100),
+                              size=(45, screen.get_height()), groups=[all_sprites, collision_sprites])
         obs4 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2),
-                              size=(screen.get_width(), 25), groups=[all_sprites, collision_sprites])
+                              size=(screen.get_width(), 45), groups=[all_sprites, collision_sprites])
 
-        obs5 = StaticObstacle(pos=(screen.get_width() // 2 - 125, 0), size=(25, screen.get_height() // 2 - 125),
+        obs5 = StaticObstacle(pos=(screen.get_width() // 2 - 125, 0), size=(45, screen.get_height() // 2 - 125),
                               groups=[all_sprites, collision_sprites])
         obs6 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 - 125),
-                              size=(screen.get_width() // 3, 25), groups=[all_sprites, collision_sprites])
+                              size=(screen.get_width() // 3, 45), groups=[all_sprites, collision_sprites])
 
-        obs7 = StaticObstacle(pos=(screen.get_width() // 1.5, 0), size=(25, screen.get_height() // 2 - 175),
+        obs7 = StaticObstacle(pos=(screen.get_width() // 1.5, 0), size=(45, screen.get_height() // 2 - 175),
                               groups=[all_sprites, collision_sprites])
-        obs8 = StaticObstacle(pos=(0, screen.get_height() // 2 - 125), size=(200, 25),
+        obs8 = StaticObstacle(pos=(0, screen.get_height() // 2 - 125), size=(200, 45),
                               groups=[all_sprites, collision_sprites])
 
         obs9 = StaticObstacle(pos=(600, 500), size=(100, 100), groups=[all_sprites, collision_sprites])
@@ -1349,15 +1349,15 @@ def generate_room(all_sprites,collision_sprites,screen, type):
         obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
         obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
         obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
-        obs8 = MovingVerticalObstacle((500, 0), (25, 25), [all_sprites, collision_sprites], max_up=0, max_down=500, speed=5)
+        obs8 = MovingVerticalObstacle((500, 0), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=500, speed=5)
 
         moving_room_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8]
         return moving_room_obstacles
 
     elif type == "corridor":
         # corridor room
-        obs1 = StaticObstacle(pos=(0, 0), size=(25, screen.get_height()-100), groups=[all_sprites, collision_sprites])
-        obs2 = StaticObstacle(pos=(100, 100), size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs1 = StaticObstacle(pos=(0, 0), size=(50, screen.get_height()-100), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(100, 100), size=(50, screen.get_height()), groups=[all_sprites, collision_sprites])
         obs3 = StaticObstacle(pos=(200, 0), size=(50, 100), groups=[all_sprites, collision_sprites])
         obs4 = StaticObstacle(pos=(200, 200), size=(50, screen.get_height()-300), groups=[all_sprites, collision_sprites])
         obs5 = StaticObstacle(pos=(300, 100), size=(50, screen.get_height()- 133), groups=[all_sprites, collision_sprites])

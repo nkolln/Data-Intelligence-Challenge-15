@@ -14,7 +14,7 @@ model = LinearQNet(13, 512, 256, 8)
 plot_count = 1
 simulationnr_stop = 2
 
-for room in room_types:
+for room in room_types[0:]:
     for lr in learning_rates:
         for op in optimizers:
             if op == 'Adam':
