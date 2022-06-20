@@ -16,6 +16,7 @@ class LinearQNet(nn.Module):
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
+        # x = nn.Tanh()(x)
 
         return x
 
@@ -70,7 +71,7 @@ class QTrainer:
         # pred.clone()
         # preds[argmax(action)] = Q_new
         self.optimizer.zero_grad()
-        loss = self.criterion(target, pred)
+        loss = torch.sqrt(self.criterion(target, pred))
         loss.backward()
 
         self.optimizer.step()
