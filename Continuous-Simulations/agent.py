@@ -10,16 +10,16 @@ import pygame
 import copy
 from collections import deque
 from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, \
-    ChargingDock, random_obstacles
+    ChargingDock, random_obstacles, room_types, generate_room
 from model import LinearQNet, QTrainer
 from plotter import plot
-
 
 MAX_MEMORY = 5_000_000
 BATCH_SIZE = 500
 LR = 0.001
 
-#np.set_printoptions(threshold=sys.maxsize)
+
+# np.set_printoptions(threshold=sys.maxsize)
 
 class Agent:
 
@@ -143,22 +143,103 @@ def train(model, lr, optimizer, criterion, plot_count = None, simulationnr_stop 
 
     # obstacles = random_obstacles(10, screen, [all_sprites, collision_sprites], 20, 300)
 
-    # obstacle setup, random generation will be implemented
-    obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
-    obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
-    obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
-    obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
-    obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
-    obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
-    #obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
-    #obs8 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
+    # triangle room
+    # obs1 = StaticObstacle(pos=(0, 0), size=(screen.get_width(), 50), groups=[all_sprites, collision_sprites])
+    #
+    # obs2 = StaticObstacle(pos=(0, 50), size=(screen.get_width() // 2 - 33, 50), groups=[all_sprites, collision_sprites])
+    # obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 33, 50), size=(screen.get_width() // 2 - 33, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    #
+    # obs4 = StaticObstacle(pos=(0, 100), size=(screen.get_width() // 2 - 66, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    # obs5 = StaticObstacle(pos=(screen.get_width() // 2 + 66, 100), size=(screen.get_width() // 2 - 66, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    #
+    # obs6 = StaticObstacle(pos=(0, 150), size=(screen.get_width() // 2 - 100, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    # obs7 = StaticObstacle(pos=(screen.get_width() // 2 + 100, 150), size=(screen.get_width() // 2 - 100, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    #
+    # obs8 = StaticObstacle(pos=(0, 200), size=(screen.get_width() // 2 - 133, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    # obs9 = StaticObstacle(pos=(screen.get_width() // 2 + 133, 200), size=(screen.get_width() // 2 - 133, 50),
+    #                       groups=[all_sprites, collision_sprites])
+    #
+    # obs10 = StaticObstacle(pos=(0, 250), size=(screen.get_width() // 2 - 166, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    # obs11 = StaticObstacle(pos=(screen.get_width() // 2 + 166, 250), size=(screen.get_width() // 2 - 166, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    #
+    # obs12 = StaticObstacle(pos=(0, 300), size=(screen.get_width() // 2 - 200, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    # obs13 = StaticObstacle(pos=(screen.get_width() // 2 + 200, 300), size=(screen.get_width() // 2 - 200, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    #
+    # obs14 = StaticObstacle(pos=(0, 350), size=(screen.get_width() // 2 - 233, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    # obs15 = StaticObstacle(pos=(screen.get_width() // 2 + 233, 350), size=(screen.get_width() // 2 - 233, 50),
+    #                        groups=[all_sprites, collision_sprites])
+    #
+    # # obs16 = StaticObstacle(pos=(0, 400), size=(screen.get_width() // 2 - 266, 50),
+    # #                        groups=[all_sprites, collision_sprites])
+    # # obs17 = StaticObstacle(pos=(screen.get_width() // 2 + 266, 400), size=(screen.get_width() // 2 - 266, 50),
+    # #                        groups=[all_sprites, collision_sprites])
+    #
+    # # obs18 = StaticObstacle(pos=(0, 450), size=(screen.get_width() // 2 - 300, 50),
+    # #                        groups=[all_sprites, collision_sprites])
+    # # obs19 = StaticObstacle(pos=(screen.get_width() // 2 + 300, 450), size=(screen.get_width() // 2 - 300, 50),
+    # #                        groups=[all_sprites, collision_sprites])
+    #
+    # triangle_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9, obs10, obs11, obs12, obs13, obs14, obs15]
 
-    obstacles = [obs1, obs2, obs3, obs4, obs5, obs6]#, obs7, obs8]
-    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites]) 
+    # # moving obstacle room
+    # obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
+    # obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
+    # obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
+    # obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
+    # obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
+    # obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
+    # obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
+    # obs8 = MovingVerticalObstacle((500, 0), (25, 25), [all_sprites, collision_sprites], max_up=0, max_down=500, speed=5)
+    #
+    # moving_room_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8]
+
+    # # corridor room
+    # obs1 = StaticObstacle(pos=(0, 0), size=(25, screen.get_height()-100), groups=[all_sprites, collision_sprites])
+    # obs2 = StaticObstacle(pos=(100, 100), size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+    # obs3 = StaticObstacle(pos=(200, 0), size=(50, 100), groups=[all_sprites, collision_sprites])
+    # obs4 = StaticObstacle(pos=(200, 200), size=(50, screen.get_height()-300), groups=[all_sprites, collision_sprites])
+    # obs5 = StaticObstacle(pos=(300, 100), size=(50, screen.get_height()- 133), groups=[all_sprites, collision_sprites])
+    # obs6 = StaticObstacle(pos=(400, 0), size=(400, 50), groups=[all_sprites, collision_sprites])
+    # obs7 = StaticObstacle(pos=(350, 100), size=(400, 50), groups=[all_sprites, collision_sprites])
+    # obs8 = StaticObstacle(pos=(450, 200), size=(400, 50), groups=[all_sprites, collision_sprites])
+    # obs9 = StaticObstacle(pos=(500, 300), size=(200, 200), groups=[all_sprites, collision_sprites])
+    #
+    # corridor_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+
+    # full house
+    # obs1 = StaticObstacle(pos=(0, screen.get_height()//2), size=(screen.get_width()//2-100, 25), groups=[all_sprites, collision_sprites])
+    # obs2 = StaticObstacle(pos=(screen.get_width()//2-125, screen.get_height()//2+80), size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+    #
+    # obs3 = StaticObstacle(pos=(screen.get_width()//2+125, screen.get_height()//2+80), size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+    # obs4 = StaticObstacle(pos=(screen.get_width()//2 + 125, screen.get_height()//2), size=(screen.get_width(), 25), groups=[all_sprites, collision_sprites])
+    #
+    # obs5 = StaticObstacle(pos=(screen.get_width()//2 - 125, 0), size=(25, screen.get_height()//2-125), groups=[all_sprites, collision_sprites])
+    # obs6 = StaticObstacle(pos=(screen.get_width()//2 - 125, screen.get_height()//2-125), size=(screen.get_width()//3, 25), groups=[all_sprites, collision_sprites])
+    #
+    # obs7 = StaticObstacle(pos=(screen.get_width()//1.5, 0), size=(25, screen.get_height()//2-175), groups=[all_sprites, collision_sprites])
+    # obs8 = StaticObstacle(pos=(0, screen.get_height()//2-125), size=(200,25), groups=[all_sprites, collision_sprites])
+    #
+    # obs9 = StaticObstacle(pos=(600, 500), size=(100, 100), groups=[all_sprites, collision_sprites])
+    #
+    # house_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+
+    room = generate_room(all_sprites, collision_sprites, screen, "moving")
+    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
     robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
-    game = Environment(robot, obstacles, charging_dock, all_sprites, collision_sprites, screen)
 
-    
+    game = Environment(robot, room, charging_dock, all_sprites, collision_sprites, screen)
+
     while True:
         # get old state
         state_old = agent.get_state(game)
@@ -166,16 +247,16 @@ def train(model, lr, optimizer, criterion, plot_count = None, simulationnr_stop 
         final_move = agent.get_action(state_old)
 
         previous_matrix = copy.deepcopy(game.matrix)
-        #print(previous_matrix.shape)
+        # print(previous_matrix.shape)
         # perform move and get new state
         reward, done, score, efficiency = game.discrete_step(final_move)
         state_new = agent.get_state(game)
         # print(game.robot_location())
 
-        #diff_matrix = np.subtract(current_matrix, previous_matrix)
-        #print("previous: " , previous_matrix)
-        #print("current: " , current_matrix)
-        #print("diff: " , np.count_nonzero(diff_matrix == 1))
+        # diff_matrix = np.subtract(current_matrix, previous_matrix)
+        # print("previous: " , previous_matrix)
+        # print("current: " , current_matrix)
+        # print("diff: " , np.count_nonzero(diff_matrix == 1))
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
@@ -185,6 +266,14 @@ def train(model, lr, optimizer, criterion, plot_count = None, simulationnr_stop 
 
         if done:
             # train long memory, plot result
+
+            room = generate_room(all_sprites, collision_sprites, screen, random.choice(room_types))
+            robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
+            charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
+
+            game.obstacles = room
+            game.robot = robot
+            game.charging_dock = charging_dock
             game.reset()
             agent.simulation_count += 1
             agent.train_long_memory()

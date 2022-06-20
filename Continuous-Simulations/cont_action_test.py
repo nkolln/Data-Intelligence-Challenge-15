@@ -54,12 +54,12 @@ while True:
     if iter % 50 == 0:
         copy = not copy
 
-    reward, done, score, efficiency = env.cont_step(move_x, move_y, copy)
+    reward, done, score, efficiency, total = env.cont_step(move_x, move_y, copy)
 
     if not copy:
         env.revert_copy()
-    # print("reward:",reward)
-    print("Eff: ", efficiency)
+    print("total:", total)
+    # print("Eff: ", efficiency)
     iter += 1
     if done:
         env.reset()

@@ -664,6 +664,7 @@ class Environment:
         # self.dt = time.time() - self.last_time
         self.old_distance = 0
         self.clock = pygame.time.Clock()
+        self.total_reward = 0
         self.reset()
 
     # resets environment so that it can be run again
@@ -674,6 +675,8 @@ class Environment:
         self.last_time = time.time()
         self.clock = pygame.time.Clock()
         self.robot.reset_robot()
+
+        self.total_reward = 0
 
         self.path_finder = None
         self.path = []
@@ -893,14 +896,16 @@ class Environment:
             dirty += np.count_nonzero(robot_location == 4)
             clean = np.count_nonzero(robot_location == 1)
             clean += np.count_nonzero(robot_location == 5)
+            # print("dirty percentage: ", dirty / (dirty + clean))
             return dirty / (dirty + clean)
 
-        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
-                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        robot_location = self.temp_matrix[self.copy_robot.rect.topleft[1]:self.copy_robot.rect.bottomleft[1],
+                         self.copy_robot.rect.topleft[0]:self.copy_robot.rect.topright[0]]
         dirty = np.count_nonzero(robot_location == 0)
         dirty += np.count_nonzero(robot_location == 4)
         clean = np.count_nonzero(robot_location == 1)
         clean += np.count_nonzero(robot_location == 5)
+        print("dirty percentage: ", dirty / (dirty + clean))
         return dirty / (dirty + clean)
 
     # checks if up down left right of the robot is dirty
@@ -1007,9 +1012,6 @@ class Environment:
 
     def cont_step(self, x, y, update=True):
 
-        # set time passed since last step. Used for smooth movement
-        # self.dt = time.time() - self.last_time
-        # self.last_time = time.time()
         step_reward = 0  # reward for the current step
         done = False  # flag for simulation end
 
@@ -1067,9 +1069,11 @@ class Environment:
 
             if self.clean_percentage >= 100 or self.copy_robot.battery_percentage <= 1:
                 done = True
-                return step_reward, done, self.clean_percentage, efficiency
+                self.total_reward += step_reward
+                return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.temp_step_count
             # return done = False id the simulation is not done
-            return step_reward, done, self.clean_percentage, efficiency
+            self.total_reward += step_reward
+            return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.temp_step_count
 
         print("switched to original robot")
         self.step_count += 1
@@ -1122,9 +1126,11 @@ class Environment:
         if self.clean_percentage >= 100 or self.robot.battery_percentage <= 1:
             # if self.clean_percentage >= 100:
             done = True
-            return step_reward, done, self.clean_percentage, efficiency
+            self.total_reward += step_reward
+            return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.step_count
         # return done = False id the simulation is not done
-        return step_reward, done, self.clean_percentage, efficiency
+        self.total_reward += step_reward
+        return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.step_count
 
     def discrete_step(self, action, x=None, y=None):
         self.step_count += 1
@@ -1157,12 +1163,12 @@ class Environment:
             step_reward = -40
             return step_reward, done, self.clean_percentage, self.calculate_efficiency()
 
-        
+
         # if battery is low, only focus on going to dock
         if self.is_robot_battery_low():
             #print("battery low")
             self.draw_path_to_dock()
-            
+
             if self.is_robot_on_path_to_dock() and self.distance_to_dock() < self.old_distance:
                 #print("is on path")
                 step_reward = 20
@@ -1245,3 +1251,120 @@ class Environment:
 
         efficiency = (self.temp_step_count / (self.temp_step_count + self.temp_rep_step_count)) * 100
         return efficiency
+
+
+room_types = ["house", "triangle", "corridor", "moving"]
+
+
+def generate_room(all_sprites,collision_sprites,screen, type):
+    # clear the groups so stuff is not re-drawn
+    all_sprites.empty()
+    collision_sprites.empty()
+
+    if type == "house":
+        # full house
+        obs1 = StaticObstacle(pos=(0, screen.get_height() // 2), size=(screen.get_width() // 2 - 100, 25),
+                              groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 + 80),
+                              size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+
+        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2 + 80),
+                              size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs4 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2),
+                              size=(screen.get_width(), 25), groups=[all_sprites, collision_sprites])
+
+        obs5 = StaticObstacle(pos=(screen.get_width() // 2 - 125, 0), size=(25, screen.get_height() // 2 - 125),
+                              groups=[all_sprites, collision_sprites])
+        obs6 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 - 125),
+                              size=(screen.get_width() // 3, 25), groups=[all_sprites, collision_sprites])
+
+        obs7 = StaticObstacle(pos=(screen.get_width() // 1.5, 0), size=(25, screen.get_height() // 2 - 175),
+                              groups=[all_sprites, collision_sprites])
+        obs8 = StaticObstacle(pos=(0, screen.get_height() // 2 - 125), size=(200, 25),
+                              groups=[all_sprites, collision_sprites])
+
+        obs9 = StaticObstacle(pos=(600, 500), size=(100, 100), groups=[all_sprites, collision_sprites])
+
+        house_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+        return house_obstacles
+
+    elif type == "triangle":
+        # triangle room
+        obs1 = StaticObstacle(pos=(0, 0), size=(screen.get_width(), 50), groups=[all_sprites, collision_sprites])
+
+        obs2 = StaticObstacle(pos=(0, 50), size=(screen.get_width() // 2 - 33, 50), groups=[all_sprites, collision_sprites])
+        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 33, 50), size=(screen.get_width() // 2 - 33, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs4 = StaticObstacle(pos=(0, 100), size=(screen.get_width() // 2 - 66, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs5 = StaticObstacle(pos=(screen.get_width() // 2 + 66, 100), size=(screen.get_width() // 2 - 66, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs6 = StaticObstacle(pos=(0, 150), size=(screen.get_width() // 2 - 100, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs7 = StaticObstacle(pos=(screen.get_width() // 2 + 100, 150), size=(screen.get_width() // 2 - 100, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs8 = StaticObstacle(pos=(0, 200), size=(screen.get_width() // 2 - 133, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs9 = StaticObstacle(pos=(screen.get_width() // 2 + 133, 200), size=(screen.get_width() // 2 - 133, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs10 = StaticObstacle(pos=(0, 250), size=(screen.get_width() // 2 - 166, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs11 = StaticObstacle(pos=(screen.get_width() // 2 + 166, 250), size=(screen.get_width() // 2 - 166, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs12 = StaticObstacle(pos=(0, 300), size=(screen.get_width() // 2 - 200, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs13 = StaticObstacle(pos=(screen.get_width() // 2 + 200, 300), size=(screen.get_width() // 2 - 200, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs14 = StaticObstacle(pos=(0, 350), size=(screen.get_width() // 2 - 233, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs15 = StaticObstacle(pos=(screen.get_width() // 2 + 233, 350), size=(screen.get_width() // 2 - 233, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs16 = StaticObstacle(pos=(0, 400), size=(screen.get_width() // 2 - 266, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs17 = StaticObstacle(pos=(screen.get_width() // 2 + 266, 400), size=(screen.get_width() // 2 - 266, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs18 = StaticObstacle(pos=(0, 450), size=(screen.get_width() // 2 - 300, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs19 = StaticObstacle(pos=(screen.get_width() // 2 + 300, 450), size=(screen.get_width() // 2 - 300, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        triangle_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9, obs10, obs11, obs12, obs13, obs14,
+                              obs15, obs16, obs17, obs18, obs19]
+        return triangle_obstacles
+
+    elif type == "moving":
+        # moving obstacle room
+        obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
+        obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
+        obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
+        obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
+        obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
+        obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
+        obs8 = MovingVerticalObstacle((500, 0), (25, 25), [all_sprites, collision_sprites], max_up=0, max_down=500, speed=5)
+
+        moving_room_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8]
+        return moving_room_obstacles
+
+    elif type == "corridor":
+        # corridor room
+        obs1 = StaticObstacle(pos=(0, 0), size=(25, screen.get_height()-100), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(100, 100), size=(25, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs3 = StaticObstacle(pos=(200, 0), size=(50, 100), groups=[all_sprites, collision_sprites])
+        obs4 = StaticObstacle(pos=(200, 200), size=(50, screen.get_height()-300), groups=[all_sprites, collision_sprites])
+        obs5 = StaticObstacle(pos=(300, 100), size=(50, screen.get_height()- 133), groups=[all_sprites, collision_sprites])
+        obs6 = StaticObstacle(pos=(400, 0), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs7 = StaticObstacle(pos=(350, 100), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs8 = StaticObstacle(pos=(450, 200), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs9 = StaticObstacle(pos=(500, 300), size=(200, 200), groups=[all_sprites, collision_sprites])
+
+        corridor_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+        return corridor_obstacles
