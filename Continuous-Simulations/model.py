@@ -1,6 +1,6 @@
+from pickletools import optimize
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 import os
 
@@ -29,12 +29,12 @@ class LinearQNet(nn.Module):
 
 
 class QTrainer:
-    def __init__(self, model, lr, gamma):
+    def __init__(self, model, lr, gamma, optimizer, criterion):
         self.lr = lr
         self.gamma = gamma
         self.model = model
-        self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
-        self.criterion = nn.MSELoss()
+        self.optimizer = optimizer
+        self.criterion = criterion
 
     def train_step(self, state, action, reward, next_state, done):
         state = torch.tensor(state, dtype=torch.float)

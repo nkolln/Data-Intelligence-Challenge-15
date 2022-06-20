@@ -1,6 +1,9 @@
 from copy import deepcopy
+from pickletools import optimize
 
 import torch
+import torch.optim as optim
+import torch.nn as nn
 import random
 import numpy as np
 import pygame
@@ -20,14 +23,13 @@ LR = 0.001
 
 class Agent:
 
-    def __init__(self):
+    def __init__(self, model, lr, optimizer, criterion):
         self.simulation_count = 0  # total number of simulation ran
         self.epsilon = 0  # randomness
         self.gamma = 0.6  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)  # deque allows easy popping from the start if memory get too large
-
-        self.model = LinearQNet(13, 512, 256, 8)
-        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+        self.model = model
+        self.trainer = QTrainer(model, lr, self.gamma, optimizer, criterion)
 
     def get_state(self, simulation: Environment):
         robot = simulation.robot
@@ -124,13 +126,15 @@ class Agent:
 # End of Agent class
 
 
-def train():
+def train(model, lr, optimizer, criterion, plot_count = None, simulationnr_stop = None):
     plot_scores = []
-    plot_mean_scores = []
+    plot_mean_scores = [] 
+    config_list = [str(lr), optimizer.__class__.__name__, criterion.__class__.__name__] #learning rate, optimizer, criterion, roomtype
     total_score = 0
     record = 0
     eff_record = 0
-    agent = Agent()
+    
+    agent = Agent(model, lr, optimizer, criterion)
 
     screen = pygame.display.set_mode((800, 600))
 
@@ -190,7 +194,7 @@ def train():
 
             if score > record:
                 record = score
-                agent.model.save()
+                model.save()
 
             print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff record:",
                   eff_record)
@@ -199,8 +203,14 @@ def train():
             total_score += score
             mean_score = total_score / agent.simulation_count
             plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+            plot(plot_scores, plot_mean_scores, config_list, plot_count, simulationnr_stop)
 
+        if simulationnr_stop != None and agent.simulation_count == simulationnr_stop:
+            break
 
-if __name__ == '__main__':
-    train()
+# if __name__ == '__main__':
+#     lr = LR
+#     model = LinearQNet(13, 512, 256, 8)
+#     optimizer = optim.Adam(model.parameters(), lr=lr)
+#     criterion = nn.MSELoss()
+#     train(model, lr, optimizer, criterion)

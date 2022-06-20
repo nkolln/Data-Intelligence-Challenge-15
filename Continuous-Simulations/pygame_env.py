@@ -1215,7 +1215,7 @@ class Environment:
         efficiency = self.calculate_efficiency()
         # print("eff: ", efficiency)
 
-        if self.clean_percentage >= 95 or self.robot.battery_percentage <= 1:
+        if self.clean_percentage >= 99 or self.robot.battery_percentage <= 1:
             done = True
             if self.robot.battery_percentage <= 1:
                 print("battery died")
