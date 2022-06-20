@@ -628,6 +628,7 @@ class Environment:
         self.display_height = screen.get_height()
         pygame.init()
         self.screen = screen
+        self.font = pygame.font.Font(None, 25)
 
         # group setup
         self.all_sprites = all_sprites
@@ -1010,6 +1011,17 @@ class Environment:
         self.copy_sprites.empty()
         self.copy_robot = RobotCopy(self.copy_sprites, self.robot)
 
+    # displays the battery percentage and cleanliness of the room
+    def display_text(self):
+        battery_surface = self.font.render(f"Battery Percentage: {round(self.robot.battery_percentage,3)}", True, "purple")
+        battery_rect = battery_surface.get_rect(topleft=(0, 25))
+
+        clean_surface = self.font.render(f"Clean Percentage: {round(self.clean_percentage,3)}", True, "purple")
+        clean_rect = clean_surface.get_rect(topleft=(0, 50))
+
+        self.screen.blit(battery_surface, battery_rect)
+        self.screen.blit(clean_surface, clean_rect)
+
     def cont_step(self, x, y, update=True):
 
         step_reward = 0  # reward for the current step
@@ -1060,6 +1072,7 @@ class Environment:
                 self.trail_lines.append(self.robot.rect.center)
 
             pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
+            self.display_text()
 
             # update the environment so the changes can be seen on the screen
             pygame.display.update()
@@ -1111,7 +1124,7 @@ class Environment:
             self.trail_lines.append(self.robot.rect.center)
 
         pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
-
+        self.display_text()
         # update the environment so the changes can be seen on the screen
         pygame.display.update()
         self.clock.tick(60)
@@ -1214,6 +1227,8 @@ class Environment:
             self.trail_lines.append(self.robot.rect.center)
 
         pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
+
+        self.display_text()
 
         pygame.display.update()
         self.clock.tick(60)
