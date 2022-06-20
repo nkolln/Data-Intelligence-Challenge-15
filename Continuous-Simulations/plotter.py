@@ -7,7 +7,7 @@ def plot(scores, mean_scores, config_list, count_test = None, simulationnr_stop 
     display.clear_output(wait=True)
     display.display(plt.gcf())
     plt.clf()
-    plt.title('lr= ' + config_list[0] + " optimizer " + config_list[1] + " criterion " + config_list[2])
+    plt.title('lr= ' + config_list[0] + ", optimizer: " + config_list[1] + ", criterion: " + config_list[2] + ", room type: " + config_list[3])
     plt.xlabel('Number of Games')
     plt.ylabel('Score')
     plt.plot(scores)
