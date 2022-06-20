@@ -37,7 +37,24 @@ class direction_control():
 
     def generate_data(self):
         l_x,l_y = np.random.uniform(self.rc1,self.rc2,self.size_rand),np.random.uniform(self.rc1,self.rc2,self.size_rand)
-        if self.mode==-1:
+        if self.mode == -2:
+            l_x_q,l_y_q = [1,0,-1,0],[0,1,0,-1]
+            l_z = []
+            for i,(a,b) in enumerate(zip(l_x,l_y)):
+                scale = (self.sz/(a**2+ b**2))**0.5
+                l_x[i],l_y[i] = a*scale,b*scale
+                a,b = l_x[i],l_y[i]
+                reward_old = 0
+                reward_tot, _, _, _,_ = self.env.cont_step(a, b, False)
+                curr_loc,_ = self.env.robot_location(True)
+                if self.env.is_robot_in_obstacle():
+                    reward_tot=reward_tot * 10
+                    print(reward_tot)
+                l_z.append(reward_tot)
+                self.env.revert_copy()
+
+        #Q Learning Mode
+        elif self.mode==-1:
             #normal generation mode
             #l_x_q,l_y_q = [1,math.sqrt(0.5),0,-math.sqrt(0.5),-1,-math.sqrt(0.5),0,math.sqrt(0.5)],[0,math.sqrt(0.5),1,math.sqrt(0.5),0,-math.sqrt(0.5),-1,-math.sqrt(0.5)]
             l_x_q,l_y_q = [1,0,-1,0],[0,1,0,-1]
@@ -50,11 +67,13 @@ class direction_control():
                 size = self.further_step#np.random.randint(0,self.further_step,1)[0]
                 #for j in range(size):
                 for c,d in zip(l_x_q,l_y_q):
-                    reward_curr, _, _, _ = self.env.cont_step(a, b, False)
-                    reward, _, _, _ = self.env.cont_step(c,d, False)
-                    print(f'{reward_curr}  {reward}')
+                    reward_curr, _, _, _,_ = self.env.cont_step(a, b, False)
+                    reward, _, _,_, _ = self.env.cont_step(c,d, False)
                     reward_tot = self.update_Q(reward_curr,reward)
-                    print(reward_tot)
+                    if reward_tot < 0:
+                        reward, _, _,_, _ = self.env.cont_step(c,d, False)  
+                    #reward +=reward2
+                        reward_tot = self.update_Q(reward_tot,reward)
                     if reward_tot>reward_old:
                         reward_old=reward_tot
                     self.env.revert_copy()
@@ -95,8 +114,6 @@ class direction_control():
 
     def average_values(self):
         lst_sim,gpd_data = self.smallest_points()
-        print(lst_sim,gpd_data)
-        print('-'*100)
         lst_return = []
         for row in lst_sim:
             lst_return.append(gpd_data.iloc[row][self.column].mean())
@@ -115,7 +132,7 @@ class direction_control():
         
         point,_ = self.get_max_val(gpd_data)
         gpd_dist = gpd_data.distance(point)
-        lst_ids = gpd_dist.sort_values()[:int(self.neighbors/2)].index.to_numpy()
+        lst_ids = gpd_dist.sort_values()[:int(self.neighbors)].index.to_numpy()
         gpd_data_cut = gpd_data.iloc[lst_ids]
 
         if self.vb:#!=True:
