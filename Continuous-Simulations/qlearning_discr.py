@@ -155,9 +155,8 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         Q[tuple(state)] = {m:0 for m in moves}
     
     #START Q-LEARNING MAIN LOOP
-    for _ in range(20): #200 episodes
+    for _ in range(20): #20 episodes
         next_state = state.copy()
-        print(_)
         if tuple(next_state) not in Q.keys(): #initialize if not yet in dict
             Q[tuple(next_state)] = {m:0 for m in moves}
         next_position = current_position
