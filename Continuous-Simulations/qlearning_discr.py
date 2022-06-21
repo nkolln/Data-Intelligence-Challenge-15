@@ -5,13 +5,6 @@ import pygame
 from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
 import random
 
-
-'''
-TO DO (10 June): 
-    - Finish Q-learning Main loop
-    - Establish terminal state (probably based on cleanliness obtained from environment)
-'''
-
 '''
 We use Q-dictionary of format:
      {state: {action: Q-value,
@@ -40,26 +33,17 @@ def get_robot_checkpoints(center, ROBOT_SIZE):
                      (x+quart_width,y+quart_height),(x-quart_width,y+quart_height),(x+quart_width,y-quart_height),(x-quart_width,y-quart_height)]
     return roomba_points
 
-def get_robot_surrounding(center, ROBOT_SIZE):
-    '''
-    get some pixels surrounding the robot to check its surroundings
-    '''
-    x,y = center
-    half_width = ROBOT_SIZE[0]//2
-    half_height = ROBOT_SIZE[1]//2
-    roomba_surrounding = [(x+half_width+1,y),(x-half_width-1,y),(x,y+half_height+1),(x,y-half_height-1),
-                        (x+half_width+1,y+half_height+1),(x-half_width-1,y+half_height+1),
-                        (x+half_width+1,y-half_height-1),(x-half_width-1,y-half_height-1)]
-    return roomba_surrounding
-
 
 def reward_func(state, env, future_pos, overlap):
     '''
     calculate reward based on the given state and action
     
     :param state: 2d n x 2 numpy array containing the coordinates of each previous step
-    :param obs_vic: list of vicinities of obstacles near the future coordinate
-    :param action: tuple containing the coordinates of the robot after performing the move
+    :param env: The Evironment variable that the robot resides in
+    :param future_pos: The coordinates (x,y) in a tuple that the robot ends up in after
+    performing the action we're evaluating
+    :param overlap: A measure of how much overlap the robot has had so far with previously
+    cleaned areas.
     
     :return: reward for the state-action pair, efficiency so far
     '''
@@ -72,11 +56,6 @@ def reward_func(state, env, future_pos, overlap):
         if env.is_obstacle(rp):
             reward -= 5000
             
-    #check the parameter of the roomba for obstacles, to encourage getting into nooks and crannies
-    #roomba_surrounding = get_robot_surrounding(future_pos, ROBOT_SIZE)
-    #for rs in roomba_surrounding:
-    #    if env.is_obstacle(rs):
-    #        reward += 2
     
     #2. check it doesn't re-visit tiles: future_pos should not be closer than 1 (robot diameter) to a previous position
     edges = np.array(roomba_points[1:5])
