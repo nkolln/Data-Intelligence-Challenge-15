@@ -27,7 +27,6 @@ class direction_control():
         self.column = column
         self.data_present = data_present
 
-    
     #Formula to calculate the variant Q
     def update_Q(self,reward,next_reward):
         target = reward + self.gamma * next_reward
@@ -51,8 +50,11 @@ class direction_control():
                 #Updates array with scaled value
                 l_x[i],l_y[i] = a*scale,b*scale
                 a,b = l_x[i],l_y[i]
+                #finds nearby reward
                 reward_tot, _, _, _,_ = self.env.cont_step(a, b, False)
+                #saves reward
                 l_z.append(reward_tot)
+                #Reverts copy back to original position
                 self.env.revert_copy()
 
         #Q Learning Mode
@@ -65,17 +67,24 @@ class direction_control():
                 l_x[i],l_y[i] = a*scale,b*scale
                 a,b = l_x[i],l_y[i]
                 reward_old = 0
-                #for j in range(size):
+                #cycles through the four surrounding moves
                 for c,d in zip(l_x_q,l_y_q):
+                    #This must repeat the first ttwo steps for all cases unfortunately. This is due to not being able to set the system to a specific coordinate
+                    #Instead, I could reset it to the original postion, but would have to repeat the first step to get the score again and have the system move appropiately
                     reward_curr, _, _, _,_ = self.env.cont_step(a, b, False)
                     reward, _, _,_, _ = self.env.cont_step(c,d, False)
+                    #Calculate Q value
                     reward_tot = self.update_Q(reward_curr,reward)
                     if reward_tot < 0:
+                        #Extension mode, if it has no good values nearby, take another step to see if anything changes
                         reward, _, _,_, _ = self.env.cont_step(c,d, False) 
                         reward_tot = self.update_Q(reward_tot,reward)
+                    #Saves the best one
                     if reward_tot>reward_old:
                         reward_old=reward_tot
+                    #Reverts copy
                     self.env.revert_copy()
+                #Stores the best one
                 l_z.append(reward_old)
                 self.env.revert_copy()
 
@@ -88,84 +97,54 @@ class direction_control():
             l_z = [np.random.uniform(self.rv1+60,self.rv2,1) if ((a>0)and(b>0))or((a>0)and(b<0)) else np.random.uniform(self.rv1,self.rv2-60,1) for a,b in zip(l_x,l_y)]
         #l_ratio = [(self.sz/(a**2+ b**2))**0.5 for a,b in zip(l_x,l_y)]
         #print(l_z)
+        #Format for Geometry for geopandas
         geometry = [Point(a +self.x, b+self.y) for a, b in zip(l_x, l_y)]
         gpd_data = gpd.GeoDataFrame(l_z,geometry=geometry)
         return(gpd_data)
 
 
-    
-    def smallest_points(self):
+    #Function to find the closest points to eachother
+    def closest_points(self):
+        #Gets the generated Data
         gpd_data = self.generate_data()
         lst_return = []
+        #For each point, find the distance to every other point
         for a,b in zip(gpd_data['geometry'].x,gpd_data['geometry'].y):
             gpd_dist = gpd_data.distance(Point(a,b))
+            #Stores the closest neighbors amount
             lst_return.append(gpd_dist.sort_values()[:self.neighbors].index.to_numpy())
         return(lst_return,gpd_data)
 
+    #Averages the closest neighbor amount of points
     def average_values(self):
-        lst_sim,gpd_data = self.smallest_points()
+        #Gets the closet point and data
+        lst_sim,gpd_data = self.closest_points()
         lst_return = []
+        #Gets the average values for the list of ids
         for row in lst_sim:
             lst_return.append(gpd_data.iloc[row][self.column].mean())
         gpd_data[self.col_avg] = lst_return
         return(gpd_data)
 
-    def scale_circle(self):
-        gpd_data = self.average_values()
-        
-        lst_norm_scale = []
-        for a,b,r in zip(gpd_data['geometry'].x,gpd_data['geometry'].y,(gpd_data[self.col_avg])):
-            lst_norm_scale.append(Point((a-self.x)*r,((b-self.y)*r)))
-            
-        gpd_data['geometry_old'] = gpd_data['geometry']
-        gpd_data['geometry'] = lst_norm_scale
-        
-        point,_ = self.get_max_val(gpd_data)
-        gpd_dist = gpd_data.distance(point)
-        lst_ids = gpd_dist.sort_values()[:int(self.neighbors)].index.to_numpy()
-        gpd_data_cut = gpd_data.iloc[lst_ids]
-
-        if self.vb:#!=True:
-            #self.visualize_data_in_circle_avg()
-            gpd_data.plot(column = self.col_avg,cmap='hot')
-            plt.plot(np.unique(gpd_data_cut['geometry'].x), np.poly1d(np.polyfit(gpd_data_cut['geometry'].x, gpd_data_cut['geometry'].y, 1))(np.unique(gpd_data_cut['geometry'].x)))
-            #self.vb = False
-
-        return(gpd_data,gpd_data_cut)
-
+    #Calculates the final vector
     def generate_vector(self):
-        gpd_data,gpd_data_cut = self.scale_circle()
+        #Gets data
+        gpd_data = self.average_values()
         #m,b = np.polyfit(gpd_data_cut['geometry'].x, gpd_data_cut['geometry'].y, 1)
-        coords = self.get_max_val1(gpd_data)
-        #coord_best = gpd_data.iloc[idx]['geometry_old']
-        #x_c = coord_best.x-self.x
-        #y_c = -x_c/m
-        #calculate ratio
-        #r = (self.sz/(x_c**2+ y_c**2))**0.5
-        #vec = (x_c*r,y_c*r)
-        return(coords[0],coords[1])
-        return(vec[0],vec[1])
+        #Gets the id of the largest point
+        _,idx = self.get_max_val(gpd_data)
+        #stores the coordinate of largest point
+        coord_best = gpd_data.iloc[idx]['geometry']
 
+        return(coord_best.x-self.x,coord_best.y-self.y)
+
+    #Calculates the maximum vector
     def get_max_val(self,data):
         gpd_data = data
+        #gets the max id
         max_id = gpd_data['average'].idxmax()
         ret = gpd_data.iloc[max_id]['geometry']
         return(ret,max_id)
-
-    def get_max_val1(self,data):
-        gpd_data = data
-        #max_id = gpd_data['average'].nlargest(2).index
-        max_id = gpd_data['average'].idxmax()
-        ret0 = gpd_data.iloc[max_id]['geometry_old']
-        gpd_dist = gpd_data.distance(Point(ret0.x,ret0.y))
-        ids = gpd_dist.nlargest(3).index
-        ids = gpd_data.iloc[ids]['average'].nlargest(2).index[1]
-        #ids = gpd_data.iloc[ids]['average'].idxmax()
-        ret1 = gpd_data.iloc[ids]['geometry_old']
-        a,b = ret0.x+ret1.x, ret0.y+ret1.y
-        r = (self.sz/((a)**2+ (b)**2))**0.5
-        a,b = a*r,b*r
-        return(a,b)
 
 
     def visualize_data_in_circle_avg(self,data = None):
