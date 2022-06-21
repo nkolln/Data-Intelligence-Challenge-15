@@ -1128,7 +1128,7 @@ class Environment:
         # return done = True if battery is dead or run completed
         if self.clean_percentage >= 95 or self.robot.battery_percentage <= 1:
             # if self.clean_percentage >= 100:
-            print('{self.clean_percentage}  {self.robot.battery_percentage}')
+            #print('{self.clean_percentage}  {self.robot.battery_percentage}')
             done = True
             self.total_reward += step_reward
             return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.step_count
