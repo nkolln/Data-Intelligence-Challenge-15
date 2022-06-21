@@ -7,6 +7,12 @@ import random
 
 
 '''
+TO DO (10 June): 
+    - Finish Q-learning Main loop
+    - Establish terminal state (probably based on cleanliness obtained from environment)
+'''
+
+'''
 We use Q-dictionary of format:
      {state: {action: Q-value,
               action: Q-value,
@@ -64,7 +70,7 @@ def reward_func(state, env, future_pos, overlap):
     roomba_points = get_robot_checkpoints(future_pos, ROBOT_SIZE)
     for rp in roomba_points: #check if roomba points do not intercept obstacles
         if env.is_obstacle(rp):
-            return None, None, None
+            reward -= 5000
             
     #check the parameter of the roomba for obstacles, to encourage getting into nooks and crannies
     #roomba_surrounding = get_robot_surrounding(future_pos, ROBOT_SIZE)
@@ -148,11 +154,10 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
     if tuple(state) not in Q.keys(): #initialize if not yet in dict
         Q[tuple(state)] = {m:0 for m in moves}
     
-    skip_episode = False
     #START Q-LEARNING MAIN LOOP
-    for _ in range(20): #20 episodes
+    for _ in range(20): #200 episodes
         next_state = state.copy()
-        #print(_)
+        print(_)
         if tuple(next_state) not in Q.keys(): #initialize if not yet in dict
             Q[tuple(next_state)] = {m:0 for m in moves}
         next_position = current_position
@@ -160,9 +165,6 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
         terminal = False
         t = 0
         while not terminal and t < 10:
-            if skip_episode:
-                skip_episode = False
-                break
             t += 1
             #choose an action using the policy and Q-values
             action = select_action(Q[tuple(next_state)], True, epsilon)
@@ -170,23 +172,19 @@ def robot_epoch(env, alpha=0.6, gamma=0.5, epsilon=0.5):
             next_position = take_action(next_position, action, ROBOT_SIZE)
             #compute the reward
             reward, cleaned, overlap = reward_func(next_state, env, next_position, overlap)
-            if reward == None:
-                del Q[tuple(state)][action]
-                skip_episode = True
-            else:
-                #update the state
-                next_state.append(next_position)
-                if tuple(next_state) not in Q.keys():  # initialize if not yet in dict
-                    Q[tuple(next_state)] = {m: 0 for m in moves}
-    
-                #find the best possible next action that could be taken
-                next_action = select_action(Q[tuple(next_state)], False, epsilon)
-                
-                #update the Q-dictionary
-                Q[tuple(state)][action] += alpha * (reward + gamma * Q[tuple(next_state)][next_action] - Q[tuple(state)][action])
-                
-                if cleaned >= 1:
-                    terminal = True
+            #update the state
+            next_state.append(next_position)
+            if tuple(next_state) not in Q.keys():  # initialize if not yet in dict
+                Q[tuple(next_state)] = {m: 0 for m in moves}
+
+            #find the best possible next action that could be taken
+            next_action = select_action(Q[tuple(next_state)], False, epsilon)
+            
+            #update the Q-dictionary
+            Q[tuple(state)][action] += alpha * (reward + gamma * Q[tuple(next_state)][next_action] - Q[tuple(state)][action])
+            
+            if cleaned >= 1:
+                terminal = True
                 
     #find best move
     max_actions = [key for key, value in Q[tuple(state)].items() if value == max(Q[tuple(state)].values())]
