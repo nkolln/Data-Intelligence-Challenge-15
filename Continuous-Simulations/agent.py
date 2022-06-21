@@ -1,27 +1,35 @@
+from copy import deepcopy
+from pickletools import optimize
+
 import torch
+import torch.optim as optim
+import torch.nn as nn
 import random
 import numpy as np
 import pygame
+import copy
 from collections import deque
-from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, ChargingDock
+from pygame_env import Environment, StaticObstacle, Robot, MovingHorizontalObstacle, MovingVerticalObstacle, \
+    ChargingDock, random_obstacles, room_types, generate_room
 from model import LinearQNet, QTrainer
 from plotter import plot
 
-MAX_MEMORY = 1_000_000
+MAX_MEMORY = 5_000_000
 BATCH_SIZE = 500
-LR = 0.003
+LR = 0.001
 
+
+# np.set_printoptions(threshold=sys.maxsize)
 
 class Agent:
 
-    def __init__(self):
+    def __init__(self, model, lr, optimizer, criterion):
         self.simulation_count = 0  # total number of simulation ran
         self.epsilon = 0  # randomness
         self.gamma = 0.6  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)  # deque allows easy popping from the start if memory get too large
-
-        self.model = LinearQNet(12, 1024, 8)
-        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+        self.model = model
+        self.trainer = QTrainer(model, lr, self.gamma, optimizer, criterion)
 
     def get_state(self, simulation: Environment):
         robot = simulation.robot
@@ -67,11 +75,13 @@ class Agent:
 
             # check if current location is dirty
             simulation.is_robot_location_dirty(),
-
+            # check if robot vicinity is dirty
             simulation.is_robot_vicinity_dirty("up"),
             simulation.is_robot_vicinity_dirty("down"),
             simulation.is_robot_vicinity_dirty("right"),
             simulation.is_robot_vicinity_dirty("left"),
+            # check if robot battery is low
+            simulation.is_robot_battery_low()
         ]
         # return the state as an array that only contains 0s and 1s
         return np.array(state, dtype=int)
@@ -95,11 +105,11 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 80 - self.simulation_count
+        self.epsilon = 20 - self.simulation_count
 
         final_move = [0, 0, 0, 0, 0, 0, 0, 0]
 
-        if random.randint(0, 200) < self.epsilon:
+        if random.randint(0, 130) < self.epsilon:
             move = random.randint(0, 7)
             final_move[move] = 1
 
@@ -116,54 +126,61 @@ class Agent:
 # End of Agent class
 
 
-def train():
+def train(model, lr, optimizer, criterion, room_name, plot_count = None, simulationnr_stop = None):
     plot_scores = []
-    plot_mean_scores = []
+    plot_mean_scores = [] 
+    config_list = [str(lr), optimizer.__class__.__name__, criterion.__class__.__name__ , room_name] #learning rate, optimizer, criterion, roomtype
     total_score = 0
     record = 0
     eff_record = 0
-    agent = Agent()
+    
+    agent = Agent(model, lr, optimizer, criterion)
 
     screen = pygame.display.set_mode((800, 600))
 
     all_sprites = pygame.sprite.Group()
     collision_sprites = pygame.sprite.Group()
 
-    # obstacle setup, random generation will be implemented
-    obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
-    obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
-    obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
-    obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
-    obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
-    obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
-    obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
-    obs7 = MovingVerticalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=300, speed=5)
-
-    charging_dock = ChargingDock((25, 554), (50,50), [all_sprites])
-
+    room = generate_room(all_sprites, collision_sprites, screen, room_name)
+    charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
     robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
-    game = Environment(robot, [obs1, obs2, obs3, obs4, obs5, obs6, obs7], charging_dock, all_sprites, collision_sprites, screen)
 
+    game = Environment(robot, room, charging_dock, all_sprites, collision_sprites, screen)
 
     while True:
         # get old state
         state_old = agent.get_state(game)
-
         # get move
         final_move = agent.get_action(state_old)
 
+        previous_matrix = copy.deepcopy(game.matrix)
+        # print(previous_matrix.shape)
         # perform move and get new state
         reward, done, score, efficiency = game.discrete_step(final_move)
         state_new = agent.get_state(game)
+        # print(game.robot_location())
 
+        # diff_matrix = np.subtract(current_matrix, previous_matrix)
+        # print("previous: " , previous_matrix)
+        # print("current: " , current_matrix)
+        # print("diff: " , np.count_nonzero(diff_matrix == 1))
         # train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
+        # prev = curr
         # remember
         agent.remember(state_old, final_move, reward, state_new, done)
 
         if done:
             # train long memory, plot result
+
+            # room = generate_room(all_sprites, collision_sprites, screen, random.choice(room_types))
+            # robot = Robot(all_sprites, collision_sprites, screen, 0.1, 5, 20)
+            # charging_dock = ChargingDock((25, 554), (50, 50), [all_sprites])
+
+            # game.obstacles = room
+            # game.robot = robot
+            # game.charging_dock = charging_dock
             game.reset()
             agent.simulation_count += 1
             agent.train_long_memory()
@@ -173,7 +190,7 @@ def train():
 
             if score > record:
                 record = score
-                agent.model.save()
+                model.save()
 
             print('Game', agent.simulation_count, 'Score', score, 'Record:', record, "Eff: ", efficiency, "Eff record:",
                   eff_record)
@@ -182,8 +199,14 @@ def train():
             total_score += score
             mean_score = total_score / agent.simulation_count
             plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+            plot(plot_scores, plot_mean_scores, config_list, plot_count, simulationnr_stop)
 
+        if simulationnr_stop != None and agent.simulation_count == simulationnr_stop:
+            break
 
-if __name__ == '__main__':
-    train()
+# if __name__ == '__main__':
+#     lr = LR
+#     model = LinearQNet(13, 512, 256, 8)
+#     optimizer = optim.Adam(model.parameters(), lr=lr)
+#     criterion = nn.MSELoss()
+#     train(model, lr, optimizer, criterion)

@@ -4,7 +4,25 @@ import numpy as np
 import pygame, sys, time, random
 from typing import List
 from copy import deepcopy
-from PIL import Image as im
+
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
+from pathfinding.finder.dijkstra import DijkstraFinder
+from pathfinding.core.diagonal_movement import DiagonalMovement
+
+
+# creates random obstacles. returns them as an array
+def random_obstacles(obstacle_count, screen, groups, min_size, max_size):
+    width = screen.get_width()
+    height = screen.get_height()
+    obstacles = []
+
+    for i in range(obstacle_count):
+        pos = (random.randint(0, width), random.randint(0, height))
+        size = (random.randint(min_size, max_size), random.randint(min_size, max_size))
+        obs = StaticObstacle(pos, size, groups)
+        obstacles.append(obs)
+    return obstacles
 
 
 class StaticObstacle(pygame.sprite.Sprite):
@@ -34,7 +52,7 @@ class ChargingDock(pygame.sprite.Sprite):
 class MovingVerticalObstacle(StaticObstacle):
     def __init__(self, pos, size, groups, max_up, max_down, speed):
         super().__init__(pos, size, groups)
-        self.image.fill('darkgreen')
+        self.image.fill('orange')
         self.pos = pygame.math.Vector2(self.rect.topleft)
         self.direction = pygame.math.Vector2((0, 1))
         self.speed = speed
@@ -246,17 +264,6 @@ class RobotCopy(pygame.sprite.Sprite):
         self.window_collision('vertical')
 
 
-# class VisionLine(pygame.sprite.Sprite):
-#
-#     def __init__(self, size: tuple, group):
-#         super().__init__(group)
-#         self.size = size
-#         self.image = pygame.Surface(size)
-#         self.rect = self.image.get_rect()
-#
-#         self.pos = pygame.math.Vector2(self.rect.center)
-
-
 class Robot(pygame.sprite.Sprite):
     def __init__(self, groups, obstacles, screen, battery_drain_p, battery_drain_l, speed):
         super().__init__(groups)
@@ -422,7 +429,7 @@ class Robot(pygame.sprite.Sprite):
     def charge_battery(self):
         self.is_charging = True
         if self.battery_percentage < 100:
-            self.battery_percentage += np.random.exponential(self.battery_drain_l)
+            self.battery_percentage += 10
 
         if self.battery_percentage > 100:
             self.battery_percentage = 100
@@ -587,6 +594,32 @@ class Robot(pygame.sprite.Sprite):
                 self.image = pygame.transform.rotate(self.og_image, 0 + 45)
 
 
+class PathFinder:
+    def __init__(self, matrix, robot: Robot, charging_dock: ChargingDock):
+        self.matrix = matrix
+        self.robot = robot
+        self.dock = charging_dock
+        self.grid = Grid(matrix=matrix)
+
+        self.path = []
+
+    def empty_path(self):
+        self.path = []
+
+    def find_path(self):
+        start_x, start_y = self.robot.rect.center
+        start = self.grid.node(start_x // 33, start_y // 33)
+
+        end_x, end_y = self.dock.rect.center
+        end = self.grid.node(end_x // 33, end_y // 33)
+        finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
+        # finder = DijkstraFinder(diagonal_movement=DiagonalMovement.always,time_limit=3)
+        self.path, _ = finder.find_path(start, end, self.grid)
+        self.grid.cleanup()
+
+        return self.path
+
+
 class Environment:
     def __init__(self, robot: Robot, obstacles: List[StaticObstacle], charging_dock, all_sprites, collision_sprites,
                  screen,
@@ -595,6 +628,7 @@ class Environment:
         self.display_height = screen.get_height()
         pygame.init()
         self.screen = screen
+        self.font = pygame.font.Font(None, 25)
 
         # group setup
         self.all_sprites = all_sprites
@@ -607,6 +641,11 @@ class Environment:
 
         # matrix representation of the display. Used for clean percentage calculation
         self.matrix = np.array([])
+
+        self.pathfindingMatrix = []
+        self.path_finder = None
+        self.path = []
+
         self.init_matrix()
         self.clean_percentage = self.calc_clean_percentage()
 
@@ -624,24 +663,29 @@ class Environment:
 
         self.last_time = time.time()
         # self.dt = time.time() - self.last_time
-
+        self.old_distance = 0
         self.clock = pygame.time.Clock()
+        self.total_reward = 0
         self.reset()
 
     # resets environment so that it can be run again
     def reset(self):
+        self.old_distance = self.distance_to_dock()
         self.init_matrix()
         self.clean_percentage = self.calc_clean_percentage()
         self.last_time = time.time()
         self.clock = pygame.time.Clock()
         self.robot.reset_robot()
 
+        self.total_reward = 0
+
+        self.path_finder = None
+        self.path = []
+        self.init_pathfinding_matrix()
+
         self.trail_lines = []
-        # self.dt = time.time() - self.last_time
         self.step_count = 0
         self.repeated_step_count = 0
-
-        # self.cont_step(0, 0, True)
 
         self.temp_matrix = deepcopy(self.matrix)
         self.copy_robot = None
@@ -669,6 +713,56 @@ class Environment:
             obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0] + 1] = 2
         # set the cells corresponding to the current robot location to 1 (clean)
         self.set_robot_location()
+
+    # creates a matrix representation of the room only used for pathfinding
+    def init_pathfinding_matrix(self):
+        pf_matrix = np.ones(((self.display_height + 1) // 33, (self.display_width + 1) // 33), dtype=int)
+        for obstacle in self.obstacles:
+            pf_matrix[obstacle.rect.topleft[1] // 33:(obstacle.rect.topleft[1] + obstacle.size[1] + 1) // 33,
+            obstacle.rect.topleft[0] // 33:(obstacle.rect.topleft[0] + obstacle.size[0] + 1) // 33] = 0
+
+        self.pathfindingMatrix = pf_matrix
+
+    # draws the shortest path from robot to charging dock on to the screen
+    def draw_path_to_dock(self):
+        points = []
+        if self.path:
+            for idx, value in enumerate(self.path):
+                x = (value[1] * 33) + 17
+                y = (value[0] * 33) + 17
+                points.append((y, x))
+
+            if len(points) >= 2:
+                pygame.draw.lines(self.screen, "darkgreen", False, points, 5)
+            self.set_path_to_dock(points)
+
+    # changes the indices in the matrix representation that corresponds to the shortest path to the dock to 3
+    # uses the temp matrix
+    def set_path_to_dock(self, points):
+        for idx, value in enumerate(points):
+            self.temp_matrix[value[1], value[0]] = 3
+
+    # checks if robot is on the shortest path to the dock
+    # uses the temp matrix
+    def is_robot_on_path_to_dock(self):
+        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        path = np.count_nonzero(robot_location == 3)
+        return path > 0
+
+    # returns the shortest distance to the dock in pixels
+    def distance_to_dock(self):
+        return len(self.path) * 33
+
+    # calculates the minimum battery needed to go to the dock from current position
+    def calculate_minimum_battery(self):
+        dist = self.distance_to_dock()
+        speed = self.robot.speed
+        steps = dist//speed
+
+        battery_consumption = self.robot.battery_drain_l * self.robot.battery_drain_p
+        battery_needed = steps * battery_consumption
+        return battery_needed
 
     # set the cells corresponding to the current robot location to 1 (clean). if it is a wall border, it is set to 5
     def set_robot_location(self, is_copy=False):
@@ -738,6 +832,10 @@ class Environment:
 
             # set the cells corresponding to each obstacle in the matrix to 2
             for obstacle in self.obstacles:
+                if type(obstacle) == MovingVerticalObstacle or type(obstacle) == MovingHorizontalObstacle:
+                    self.matrix[obstacle.old_rect.topleft[1]:obstacle.old_rect.topleft[1] + obstacle.size[1] + 1,
+                    obstacle.old_rect.topleft[0]:obstacle.old_rect.topleft[0] + obstacle.size[0] + 1] = 0
+
                 self.matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1] + 1,
                 obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0] + 1] = 2
 
@@ -748,6 +846,10 @@ class Environment:
 
         # set obstacle locations to 2 in case robot went through them
         for obstacle in self.obstacles:
+            if type(obstacle) == MovingVerticalObstacle or type(obstacle) == MovingHorizontalObstacle:
+                self.temp_matrix[obstacle.old_rect.topleft[1]:obstacle.old_rect.topleft[1] + obstacle.size[1] + 1,
+                obstacle.old_rect.topleft[0]:obstacle.old_rect.topleft[0] + obstacle.size[0] + 1] = 0
+
             self.temp_matrix[obstacle.rect.topleft[1]:obstacle.rect.topleft[1] + obstacle.size[1],
             obstacle.rect.topleft[0]:obstacle.rect.topleft[0] + obstacle.size[0]] = 2
 
@@ -787,7 +889,7 @@ class Environment:
         # print("dirty count: ", dirty)
         return dirty > 0
 
-    def robot_location_dirty_percentage(self,is_copy=False):
+    def robot_location_dirty_percentage(self, is_copy=False):
         if not is_copy:
             robot_location = self.matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
                              self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
@@ -795,15 +897,18 @@ class Environment:
             dirty += np.count_nonzero(robot_location == 4)
             clean = np.count_nonzero(robot_location == 1)
             clean += np.count_nonzero(robot_location == 5)
-            return dirty/(dirty+clean)
+            # print("dirty percentage: ", dirty / (dirty + clean))
+            return dirty / (dirty + clean)
 
-        robot_location = self.temp_matrix[self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
-                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        robot_location = self.temp_matrix[self.copy_robot.rect.topleft[1]:self.copy_robot.rect.bottomleft[1],
+                         self.copy_robot.rect.topleft[0]:self.copy_robot.rect.topright[0]]
         dirty = np.count_nonzero(robot_location == 0)
         dirty += np.count_nonzero(robot_location == 4)
         clean = np.count_nonzero(robot_location == 1)
         clean += np.count_nonzero(robot_location == 5)
+        print("dirty percentage: ", dirty / (dirty + clean))
         return dirty / (dirty + clean)
+
     # checks if up down left right of the robot is dirty
     def is_robot_vicinity_dirty(self, location):
         robot_location = self.matrix[
@@ -883,6 +988,21 @@ class Environment:
         return self.calculate_distance(robot_center, dock_center) < self.calculate_distance(robot_previous_center,
                                                                                             dock_center)
 
+    # checks if robot went into an obstacle
+    def is_robot_in_obstacle(self):
+        robot_location = self.matrix[
+                         self.robot.rect.topleft[1]:self.robot.rect.bottomleft[1],
+                         self.robot.rect.topleft[0]:self.robot.rect.topright[0]]
+        obstacle = np.count_nonzero(robot_location == 2)
+        # return true if more than 3 quarters of the robot are in an obstacle
+        return obstacle >= robot_location.size
+
+    # checks if robot battery percentage is lower than minimum battery needed to go to the dock
+    def is_robot_battery_low(self):
+        battery_needed = self.calculate_minimum_battery()
+        # print("min battery: ", battery_needed)
+        return self.robot.battery_percentage < battery_needed
+
     # reverts the copy robot to the position of the original robot. also reverts the temp_matrix
     def revert_copy(self):
         self.temp_matrix = deepcopy(self.matrix)
@@ -891,11 +1011,19 @@ class Environment:
         self.copy_sprites.empty()
         self.copy_robot = RobotCopy(self.copy_sprites, self.robot)
 
+    # displays the battery percentage and cleanliness of the room
+    def display_text(self):
+        battery_surface = self.font.render(f"Battery Percentage: {round(self.robot.battery_percentage,3)}", True, "purple")
+        battery_rect = battery_surface.get_rect(topleft=(0, 25))
+
+        clean_surface = self.font.render(f"Clean Percentage: {round(self.clean_percentage,3)}", True, "purple")
+        clean_rect = clean_surface.get_rect(topleft=(0, 50))
+
+        self.screen.blit(battery_surface, battery_rect)
+        self.screen.blit(clean_surface, clean_rect)
+
     def cont_step(self, x, y, update=True):
 
-        # set time passed since last step. Used for smooth movement
-        # self.dt = time.time() - self.last_time
-        # self.last_time = time.time()
         step_reward = 0  # reward for the current step
         done = False  # flag for simulation end
 
@@ -922,7 +1050,7 @@ class Environment:
             # reward system
             # if current location is more clean than dirty give low reward, else give high reward
             if self.is_robot_location_dirty(True):
-                step_reward = (19 * self.robot_location_dirty_percentage(True))+1
+                step_reward = (19 * self.robot_location_dirty_percentage(True)) + 1
                 # print("location dirty")
             else:
                 step_reward = -15
@@ -944,6 +1072,7 @@ class Environment:
                 self.trail_lines.append(self.robot.rect.center)
 
             pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
+            self.display_text()
 
             # update the environment so the changes can be seen on the screen
             pygame.display.update()
@@ -953,9 +1082,11 @@ class Environment:
 
             if self.clean_percentage >= 100 or self.copy_robot.battery_percentage <= 1:
                 done = True
-                return step_reward, done, self.clean_percentage, efficiency
+                self.total_reward += step_reward
+                return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.temp_step_count
             # return done = False id the simulation is not done
-            return step_reward, done, self.clean_percentage, efficiency
+            self.total_reward += step_reward
+            return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.temp_step_count
 
         print("switched to original robot")
         self.step_count += 1
@@ -993,7 +1124,7 @@ class Environment:
             self.trail_lines.append(self.robot.rect.center)
 
         pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
-
+        self.display_text()
         # update the environment so the changes can be seen on the screen
         pygame.display.update()
         self.clock.tick(60)
@@ -1008,9 +1139,11 @@ class Environment:
         if self.clean_percentage >= 100 or self.robot.battery_percentage <= 1:
             # if self.clean_percentage >= 100:
             done = True
-            return step_reward, done, self.clean_percentage, efficiency
+            self.total_reward += step_reward
+            return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.step_count
         # return done = False id the simulation is not done
-        return step_reward, done, self.clean_percentage, efficiency
+        self.total_reward += step_reward
+        return step_reward, done, self.clean_percentage, efficiency, self.total_reward/self.step_count
 
     def discrete_step(self, action, x=None, y=None):
         self.step_count += 1
@@ -1027,21 +1160,50 @@ class Environment:
         # drawing and updating the screen
         self.screen.fill('lightblue')
         self.all_sprites.update(action, x, y, False)
-        # if current location is more clean than dirty give low reward, else give high reward
-        if self.is_robot_location_dirty():
-            step_reward = (19 * self.robot_location_dirty_percentage()) + 1
-            # print("location dirty")
+        self.all_sprites.draw(self.screen)
+
+        # find a path to the charging dock
+        if self.path_finder is None:
+            self.path_finder = PathFinder(self.pathfindingMatrix, self.robot, self.charging_dock)
+
+        self.path = self.path_finder.find_path()
+
+        # reward system
+        # if robot goes into an obstacle give bad reward and end simulation
+        if self.is_robot_in_obstacle():
+            done = True
+            print("robot went into an obstacle and died")
+            step_reward = -40
+            return step_reward, done, self.clean_percentage, self.calculate_efficiency()
+
+
+        # if battery is low, only focus on going to dock
+        if self.is_robot_battery_low():
+            #print("battery low")
+            self.draw_path_to_dock()
+
+            if self.is_robot_on_path_to_dock() and self.distance_to_dock() < self.old_distance:
+                #print("is on path")
+                step_reward = 20
+            else:
+                step_reward = -20
+
         else:
-            step_reward = -15
-            self.repeated_step_count += 1
-            # print("location clean")
-        # low reward if robot hit something
-        if self.robot.robot_collided:
-            step_reward += -5
+            # if current location is more clean than dirty give low reward, else give high reward
+            if self.is_robot_location_dirty():
+                step_reward = (19 * self.robot_location_dirty_percentage()) + 1
+                # print("location dirty")
+            else:
+                step_reward = -15
+                self.repeated_step_count += 1
+                # print("location clean")
+            # low reward if robot hit something
+            if self.robot.robot_collided:
+                step_reward += -5
 
         self.update_matrix()
-
-        self.all_sprites.draw(self.screen)
+        self.old_distance = self.distance_to_dock()
+        self.temp_matrix = deepcopy(self.matrix)  # used in pathfinding
 
         # battery charging
         x_bool = (self.charging_dock.pos[0] - self.charging_dock.size[0] / 2) < self.robot.pos[0] and self.robot.pos[
@@ -1050,15 +1212,13 @@ class Environment:
             1] < (self.charging_dock.pos[1] + self.charging_dock.size[1] / 2)
 
         if x_bool and y_bool and self.robot.battery_percentage < 100:
-            print("charging battery")
+            #print("charging battery")
             self.robot.charge_battery()
         else:
             self.robot.is_charging = False
 
-        # if len(self.robot.vision_lines) <= 0:
-        #     self.robot.init_vision_lines()
-        # else:
-        #     self.robot.update_vision_lines(dt)
+        # print(np.count_nonzero(self.matrix == 3))
+
         # draw the trail line
         if len(self.trail_lines) <= 0:
             self.trail_lines.append(self.robot.rect.center)
@@ -1068,14 +1228,20 @@ class Environment:
 
         pygame.draw.lines(surface=self.screen, color="red", closed=False, points=self.trail_lines, width=5)
 
+        self.display_text()
+
         pygame.display.update()
         self.clock.tick(60)
 
         efficiency = self.calculate_efficiency()
         # print("eff: ", efficiency)
 
-        if self.clean_percentage >= 100 or self.robot.battery_percentage <= 1:
+        if self.clean_percentage >= 99 or self.robot.battery_percentage <= 1:
             done = True
+            if self.robot.battery_percentage <= 1:
+                print("battery died")
+            else:
+                print("cleaned all")
             return step_reward, done, self.clean_percentage, efficiency
 
         return step_reward, done, self.clean_percentage, efficiency
@@ -1100,3 +1266,120 @@ class Environment:
 
         efficiency = (self.temp_step_count / (self.temp_step_count + self.temp_rep_step_count)) * 100
         return efficiency
+
+
+room_types = ["house", "triangle", "corridor", "moving"]
+
+
+def generate_room(all_sprites,collision_sprites,screen, type):
+    # clear the groups so stuff is not re-drawn
+    all_sprites.empty()
+    collision_sprites.empty()
+
+    if type == "house":
+        # full house
+        obs1 = StaticObstacle(pos=(0, screen.get_height() // 2), size=(screen.get_width() // 2 - 100, 45),
+                              groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 + 100),
+                              size=(45, screen.get_height()), groups=[all_sprites, collision_sprites])
+
+        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2 + 100),
+                              size=(45, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs4 = StaticObstacle(pos=(screen.get_width() // 2 + 125, screen.get_height() // 2),
+                              size=(screen.get_width(), 45), groups=[all_sprites, collision_sprites])
+
+        obs5 = StaticObstacle(pos=(screen.get_width() // 2 - 125, 0), size=(45, screen.get_height() // 2 - 125),
+                              groups=[all_sprites, collision_sprites])
+        obs6 = StaticObstacle(pos=(screen.get_width() // 2 - 125, screen.get_height() // 2 - 125),
+                              size=(screen.get_width() // 3, 45), groups=[all_sprites, collision_sprites])
+
+        obs7 = StaticObstacle(pos=(screen.get_width() // 1.5, 0), size=(45, screen.get_height() // 2 - 175),
+                              groups=[all_sprites, collision_sprites])
+        obs8 = StaticObstacle(pos=(0, screen.get_height() // 2 - 125), size=(200, 45),
+                              groups=[all_sprites, collision_sprites])
+
+        obs9 = StaticObstacle(pos=(600, 500), size=(100, 100), groups=[all_sprites, collision_sprites])
+
+        house_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+        return house_obstacles
+
+    elif type == "triangle":
+        # triangle room
+        obs1 = StaticObstacle(pos=(0, 0), size=(screen.get_width(), 50), groups=[all_sprites, collision_sprites])
+
+        obs2 = StaticObstacle(pos=(0, 50), size=(screen.get_width() // 2 - 33, 50), groups=[all_sprites, collision_sprites])
+        obs3 = StaticObstacle(pos=(screen.get_width() // 2 + 33, 50), size=(screen.get_width() // 2 - 33, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs4 = StaticObstacle(pos=(0, 100), size=(screen.get_width() // 2 - 66, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs5 = StaticObstacle(pos=(screen.get_width() // 2 + 66, 100), size=(screen.get_width() // 2 - 66, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs6 = StaticObstacle(pos=(0, 150), size=(screen.get_width() // 2 - 100, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs7 = StaticObstacle(pos=(screen.get_width() // 2 + 100, 150), size=(screen.get_width() // 2 - 100, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs8 = StaticObstacle(pos=(0, 200), size=(screen.get_width() // 2 - 133, 50),
+                              groups=[all_sprites, collision_sprites])
+        obs9 = StaticObstacle(pos=(screen.get_width() // 2 + 133, 200), size=(screen.get_width() // 2 - 133, 50),
+                              groups=[all_sprites, collision_sprites])
+
+        obs10 = StaticObstacle(pos=(0, 250), size=(screen.get_width() // 2 - 166, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs11 = StaticObstacle(pos=(screen.get_width() // 2 + 166, 250), size=(screen.get_width() // 2 - 166, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs12 = StaticObstacle(pos=(0, 300), size=(screen.get_width() // 2 - 200, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs13 = StaticObstacle(pos=(screen.get_width() // 2 + 200, 300), size=(screen.get_width() // 2 - 200, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs14 = StaticObstacle(pos=(0, 350), size=(screen.get_width() // 2 - 233, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs15 = StaticObstacle(pos=(screen.get_width() // 2 + 233, 350), size=(screen.get_width() // 2 - 233, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs16 = StaticObstacle(pos=(0, 400), size=(screen.get_width() // 2 - 266, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs17 = StaticObstacle(pos=(screen.get_width() // 2 + 266, 400), size=(screen.get_width() // 2 - 266, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        obs18 = StaticObstacle(pos=(0, 450), size=(screen.get_width() // 2 - 300, 50),
+                               groups=[all_sprites, collision_sprites])
+        obs19 = StaticObstacle(pos=(screen.get_width() // 2 + 300, 450), size=(screen.get_width() // 2 - 300, 50),
+                               groups=[all_sprites, collision_sprites])
+
+        triangle_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9, obs10, obs11, obs12, obs13, obs14,
+                              obs15, obs16, obs17, obs18, obs19]
+        return triangle_obstacles
+
+    elif type == "moving":
+        # moving obstacle room
+        obs1 = StaticObstacle(pos=(100, 500), size=(100, 50), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle((400, 400), (100, 200), [all_sprites, collision_sprites])
+        obs3 = StaticObstacle((200, 200), (200, 100), [all_sprites, collision_sprites])
+        obs4 = StaticObstacle((300, 100), (200, 300), [all_sprites, collision_sprites])
+        obs5 = StaticObstacle((1, 1), (200, 100), [all_sprites, collision_sprites])
+        obs6 = StaticObstacle((700, 1), (50, 400), [all_sprites, collision_sprites])
+        obs7 = MovingHorizontalObstacle((0, 300), (50, 50), [all_sprites, collision_sprites], max_left=0, max_right=300, speed=5)
+        obs8 = MovingVerticalObstacle((500, 0), (50, 50), [all_sprites, collision_sprites], max_up=0, max_down=500, speed=5)
+
+        moving_room_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8]
+        return moving_room_obstacles
+
+    elif type == "corridor":
+        # corridor room
+        obs1 = StaticObstacle(pos=(0, 0), size=(50, screen.get_height()-100), groups=[all_sprites, collision_sprites])
+        obs2 = StaticObstacle(pos=(100, 100), size=(50, screen.get_height()), groups=[all_sprites, collision_sprites])
+        obs3 = StaticObstacle(pos=(200, 0), size=(50, 100), groups=[all_sprites, collision_sprites])
+        obs4 = StaticObstacle(pos=(200, 200), size=(50, screen.get_height()-300), groups=[all_sprites, collision_sprites])
+        obs5 = StaticObstacle(pos=(300, 100), size=(50, screen.get_height()- 133), groups=[all_sprites, collision_sprites])
+        obs6 = StaticObstacle(pos=(400, 0), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs7 = StaticObstacle(pos=(350, 100), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs8 = StaticObstacle(pos=(450, 200), size=(400, 50), groups=[all_sprites, collision_sprites])
+        obs9 = StaticObstacle(pos=(500, 300), size=(200, 200), groups=[all_sprites, collision_sprites])
+
+        corridor_obstacles = [obs1, obs2, obs3, obs4, obs5, obs6, obs7, obs8, obs9]
+        return corridor_obstacles
